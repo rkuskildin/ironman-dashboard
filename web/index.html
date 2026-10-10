@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ironman Dashboard</title>
+  <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f0f0e" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=14">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><img src="icons/icon.svg" alt=""><div><b>Ironman</b><span id="race-mini" class="muted"></span></div></div>
+    <nav class="tabs" id="tabs">
+      <a href="#today" data-view="today"><i data-icon="home"></i><span>Сегодня</span></a>
+      <a href="#calendar" data-view="calendar"><i data-icon="calendar"></i><span>План/факт</span></a>
+      <a href="#goal" data-view="goal"><i data-icon="flag"></i><span>Дисциплины</span></a>
+      <a href="#load" data-view="load"><i data-icon="trend"></i><span>Нагрузка</span></a>
+      <a href="#health" data-view="health"><i data-icon="heart"></i><span>Здоровье</span></a>
+      <a href="#settings" data-view="settings" class="athlete-only"><i data-icon="sliders"></i><span>Источники</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <button id="sync-btn" class="btn ghost full"><i data-icon="refresh"></i><span>Обновить данные</span></button>
+      <div id="sync-info" class="muted"></div>
+      <span id="demo-badge" class="badge" hidden>демо-режим</span>
+      <div id="user-box" class="user-box"></div>
+    </div>
+  </aside>
+
+  <header class="mobile-bar">
+    <div class="brand"><img src="icons/icon.svg" alt=""><b>Ironman</b></div>
+    <div style="display:flex;gap:2px"><button id="sync-btn-m" class="icon-btn" aria-label="Обновить"><i data-icon="refresh"></i></button>
+    <button id="logout-m" class="icon-btn" aria-label="Выйти"><i data-icon="logout"></i></button></div>
+  </header>
+
+  <main id="app">
+    <section id="view-today" class="view"></section>
+    <section id="view-calendar" class="view"></section>
+    <section id="view-goal" class="view"></section>
+    <section id="view-load" class="view"></section>
+    <section id="view-health" class="view"></section>
+    <section id="view-settings" class="view"></section>
+    <section id="view-report" class="view"></section>
+  </main>
+
+  <div id="tooltip" class="toast" hidden></div>
+  <script src="app.js?v=15"></script>
+</body>
+</html>

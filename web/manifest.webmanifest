@@ -1,0 +1,78 @@
+{
+  "name": "Ironman Dashboard",
+  "short_name": "Ironman",
+  "description": "План тренера, выполнение, форма и восстановление",
+  "start_url": "/#today",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#1a1a19",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Сегодня",
+      "url": "/#today",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "План и факт",
+      "short_name": "План/факт",
+      "url": "/#calendar",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Путь к старту",
+      "short_name": "Путь",
+      "url": "/#goal/path",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Отчёт за неделю",
+      "short_name": "Отчёт",
+      "url": "/#report",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

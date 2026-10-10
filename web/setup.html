@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Пароль · Ironman</title>
+  <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f0f0e" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=10">
+  <style>
+    body { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+    .login { width: 100%; max-width: 380px; }
+    .login-brand { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 22px; text-align: center; }
+    .login-brand img { width: 56px; height: 56px; border-radius: 15px; }
+    .login-brand h1 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+    .login-brand p { margin: 0; color: var(--muted); }
+    .login .card { padding: 24px; }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .field span { font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
+    .field input {
+      font: inherit; font-size: 15px; color: var(--ink); background: var(--page);
+      border: 1px solid var(--border); border-radius: 11px; padding: 11px 13px; outline: none;
+    }
+    .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .login .btn.primary { width: 100%; padding: 11px; font-size: 15px; margin-top: 4px; }
+    .err { display: none; margin-bottom: 14px; padding: 10px 12px; border-radius: 10px; font-size: 13px; background: var(--bad-soft); color: var(--bad-ink); }
+    .err.on { display: block; }
+    .foot { margin-top: 18px; text-align: center; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main class="login">
+    <div class="login-brand">
+      <img src="icons/icon.svg" alt="">
+      <h1>Ironman Dashboard</h1>
+      <p id="who">Проверяю ссылку…</p>
+    </div>
+    <form class="card" id="f" hidden>
+      <div class="err" id="err" role="alert"></div>
+      <input name="username" autocomplete="username" id="un" hidden>
+      <label class="field"><span>Новый пароль · не короче 10 символов</span>
+        <input name="password" type="password" autocomplete="new-password" minlength="10" required autofocus></label>
+      <label class="field"><span>Ещё раз</span>
+        <input name="password2" type="password" autocomplete="new-password" minlength="10" required></label>
+      <button class="btn primary" type="submit">Задать пароль и войти</button>
+    </form>
+    <div class="foot" id="foot">Ссылка одноразовая</div>
+  </main>
+  <script>
+    const token = location.hash.slice(1), f = document.getElementById("f"), err = document.getElementById("err"), who = document.getElementById("who");
+    const post = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    (async () => {
+      const r = await post("/api/invite", { token, password: "" });
+      if (!r.ok) { who.textContent = (await r.json().catch(() => ({}))).detail || "Ссылка недействительна"; return; }
+      const u = await r.json();
+      who.textContent = `${u.name || u.login} · ${u.role_name}. Придумайте пароль для входа`;
+      document.getElementById("un").value = u.login;
+      f.hidden = false; f.password.focus();
+    })();
+    f.onsubmit = async (e) => {
+      e.preventDefault(); err.classList.remove("on");
+      if (f.password.value !== f.password2.value) { err.textContent = "Пароли не совпадают"; err.classList.add("on"); return; }
+      const b = f.querySelector("button"); b.disabled = true;
+      const r = await post("/api/setup", { token, password: f.password.value });
+      if (r.ok) { history.replaceState(null, "", "/setup"); location.replace("/"); return; }
+      err.textContent = (await r.json().catch(() => ({}))).detail || "Не получилось"; err.classList.add("on"); b.disabled = false;
+    };
+  </script>
+</body>
+</html>
