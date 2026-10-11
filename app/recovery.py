@@ -235,3 +235,35 @@ def history(days: int = 30) -> list[dict]:
         s = day_strain(d)
         out.append({"date": d, "recovery": r["score"], "zone": r["zone"], "strain": s and s["strain"]})
     return out
+
+
+def widget_summary() -> dict:
+    """Компактная сводка для виджета: восстановление, нагрузка, тренировка дня, режим, форма, старт."""
+    t = today()
+    o = service.overview()
+    items = []
+    for i in o["today_items"]:
+        p, a = i.get("planned") or {}, i.get("actual") or {}
+        if i["sport"] == "rest":
+            items.append({"sport": "rest", "title": "День отдыха", "status": "rest"})
+            continue
+        dist = p.get("distance_m") or a.get("distance_m")
+        items.append({"sport": i["sport"], "title": p.get("title") or a.get("title"), "status": i["status"],
+                      "distance_km": round(dist / 1000, 1) if dist else None,
+                      "minutes": round((p.get("duration_s") or a.get("duration_s") or 0) / 60) or None,
+                      "compliance": i.get("compliance")})
+    last = (o.get("regime") or {}).get("last") or {}
+    f = o.get("form") or {}
+    rec = t["recovery"]
+    return {
+        "updated": datetime.now().strftime("%H:%M"),
+        "recovery": rec["score"], "zone": rec["zone"], "hrv": rec["hrv"], "hrv_base": rec["hrv_base"], "sleep_h": rec["sleep_h"],
+        "strain": t["strain"], "target": t["target"], "remaining": t["remaining"],
+        "remaining_z2_min": t["remaining_z2_min"], "remaining_z4_min": t["remaining_z4_min"],
+        "planned_strain": t["planned_strain"], "over_plan": t["over_plan"],
+        "hr_updated": t["hr_updated"], "hr_stale": t["hr_stale_min"] > 60,
+        "workouts": items,
+        "bed_time": last.get("bed_time"), "bed_on_time": last.get("on_time"),
+        "ctl": round(f["ctl"]) if f.get("ctl") is not None else None, "tsb": round(f["tsb"]) if f.get("tsb") is not None else None,
+        "race": o["race"]["name"], "days_left": o["race"]["days_left"],
+    }

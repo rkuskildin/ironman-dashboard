@@ -40,7 +40,7 @@ async def lifespan(_app):
 app = FastAPI(title="Ironman Dashboard", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 # Без входа доступны только страница логина и её оформление
-PUBLIC = {"/login", "/api/login", "/setup", "/api/setup", "/api/invite", "/styles.css", "/manifest.webmanifest", "/sw.js"}
+PUBLIC = {"/login", "/api/login", "/setup", "/api/setup", "/api/invite", "/api/widget", "/styles.css", "/manifest.webmanifest", "/sw.js"}
 PUBLIC_PREFIX = ("/icons/",)
 # Тренер видит всё, но не меняет данные и не трогает подключения спортсмена
 COACH_DENY = (("PUT", "/api/goals"), ("PUT", "/api/thresholds"), ("PUT", "/api/race"), ("POST", "/api/weight"),
@@ -328,6 +328,14 @@ def readiness():
 @app.get("/api/readiness/history")
 def readiness_history(days: int = 30):
     return recovery.history(min(days, 120))
+
+
+@app.get("/api/widget")
+def widget(token: str = ""):
+    """Сводка для виджета на рабочем столе — только чтение, по отдельному ключу (не паролю)."""
+    if not auth.check_widget_token(token):
+        raise HTTPException(401, "Неверный ключ виджета")
+    return recovery.widget_summary()
 
 
 @app.get("/api/status")

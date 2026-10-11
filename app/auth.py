@@ -149,6 +149,23 @@ def accept_invite(token: str, password: str) -> str:
     return token_s
 
 
+def new_widget_token() -> str:
+    """Ключ только для чтения сводки виджета. Новый ключ отменяет старый."""
+    token = secrets.token_urlsafe(24)
+    with db.session() as c:
+        c.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+        c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('widget_token', ?)", (_th(token),))
+    return token
+
+
+def check_widget_token(token: str) -> bool:
+    if not token:
+        return False
+    with db.session() as c:
+        row = c.execute("SELECT value FROM settings WHERE key='widget_token'").fetchone()
+    return bool(row) and hmac.compare_digest(row["value"], _th(token))
+
+
 def has_users() -> bool:
     with db.session() as c:
         return c.execute("SELECT 1 FROM users LIMIT 1").fetchone() is not None
@@ -168,6 +185,7 @@ def _cli():
     i.add_argument("login")
     i.add_argument("--role", choices=ROLES, default="athlete")
     i.add_argument("--name", default="")
+    sub.add_parser("widget-token", help="новый ключ для виджета (старый перестанет работать)")
     sub.add_parser("list")
     r = sub.add_parser("remove")
     r.add_argument("login")
@@ -176,6 +194,9 @@ def _cli():
     if args.cmd == "invite":
         url = create_invite(args.login, args.role, args.name)
         print(f"Ссылка для {args.login} ({ROLES[args.role]}), действует {INVITE_HOURS} ч:\n{url}")
+        return
+    if args.cmd == "widget-token":
+        print(new_widget_token())
         return
     if args.cmd == "list":
         with db.session() as c:
