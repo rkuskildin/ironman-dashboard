@@ -49,6 +49,20 @@ python -m app.auth invite coach --role coach     # одноразовая ссы
 python -m app.auth list | remove <логин>
 ```
 
+## Виджет на рабочий стол macOS
+
+`widget/ironman.widget.jsx` — виджет для [Übersicht](https://tracesof.net/uebersicht/): восстановление, нагрузка дня, тренировка на сегодня, отбой, дни до старта. Обновляется раз в 15 минут, клик открывает панель.
+
+```bash
+brew install --cask ubersicht
+mkdir -p ~/.config/ironman-widget && chmod 700 ~/.config/ironman-widget
+echo "https://ваш-адрес" > ~/.config/ironman-widget/url
+python -m app.auth widget-token > ~/.config/ironman-widget/token   # на сервере; ключ только для чтения сводки
+ln -s "$PWD/widget/ironman.widget.jsx" ~/Library/Application\ Support/Übersicht/widgets/
+```
+
+Положение — константы `TOP` / `LEFT` в начале файла.
+
 ## Развёртывание на сервере
 
 Проверено на Ubuntu 24.04: пользователь `ironman`, код в `/opt/ironman/app`, systemd-служба `ironman` (uvicorn на 127.0.0.1:8000), Caddy с автоматическим HTTPS перед ней, файрвол ufw (22, 80, 443). Данные синхронизируются раз в час (`SYNC_INTERVAL_MIN`).
