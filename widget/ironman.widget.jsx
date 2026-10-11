@@ -19,20 +19,22 @@ const ZONE = { green: "#3ecf5a", yellow: "#f5c03b", red: "#ff6159" };
 const SPORT = { run: "🏃", bike: "🚴", swim: "🏊", strength: "💪", hockey: "🏒", football: "⚽", rest: "🌙", other: "•" };
 const STATUS = { done: "✓", partial: "◐", off: "≠", missed: "✗", today: "", upcoming: "", unplanned: "+", rest: "" };
 
-const Ring = ({ value, max, color, label, sub, band }) => {
-  const R = 30, C = 2 * Math.PI * R;
+const ru = (v) => (v == null ? "—" : String(v).replace(".", ","));
+
+const Ring = ({ value, max, color, label, sub, band, unit }) => {
+  const R = 27, C = 2 * Math.PI * R;
   const frac = Math.max(0, Math.min(1, (value || 0) / max));
   const arc = (a0, a1, col, w) => (
-    <circle cx="36" cy="36" r={R} fill="none" stroke={col} strokeWidth={w} strokeLinecap="round"
-      strokeDasharray={`${Math.max(0.01, (a1 - a0) * C)} ${C}`} strokeDashoffset={-a0 * C} transform="rotate(-90 36 36)" />
+    <circle cx="32" cy="32" r={R} fill="none" stroke={col} strokeWidth={w} strokeLinecap="round"
+      strokeDasharray={`${Math.max(0.01, (a1 - a0) * C)} ${C}`} strokeDashoffset={-a0 * C} transform="rotate(-90 32 32)" />
   );
   return (
     <div className={ringBox}>
-      <svg width="72" height="72" viewBox="0 0 72 72">
-        <circle cx="36" cy="36" r={R} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="7" />
-        {band && arc(band[0] / max, band[1] / max, "rgba(62,207,90,.35)", 7)}
-        {value != null && arc(0, frac, color, 7)}
-        <text x="36" y="40" textAnchor="middle" className={ringVal}>{value == null ? "—" : value}</text>
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r={R} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="6" />
+        {band && arc(band[0] / max, band[1] / max, "rgba(62,207,90,.38)", 6)}
+        {value != null && frac > 0.01 && arc(0, frac, color, 6)}
+        <text x="32" y="37" textAnchor="middle" className={ringVal}>{ru(value)}{unit && <tspan className={ringUnit}>{unit}</tspan>}</text>
       </svg>
       <div className={ringLabel}>{label}</div>
       {sub && <div className={ringSub}>{sub}</div>}
@@ -47,31 +49,28 @@ export const render = ({ output, error }) => {
     return <div className={card}><div className={muted}>Ironman: нет связи с панелью{d && d.detail ? ` — ${d.detail}` : ""}</div></div>;
   }
   const w = (d.workouts || [])[0];
+  const short = (m) => (m >= 90 ? `${ru(Math.round(m / 6) / 10)} ч` : `${m} мин`);
+  // спокойная работа, если влезает в 2,5 ч; иначе — сколько нужно в Z4
+  const useZ2 = d.remaining_z2_min <= 150;
   const left = d.remaining > 0.3
-    ? `до оптимума ≈ ${d.remaining_z2_min > 180 ? `${Math.round(d.remaining_z2_min / 60)} ч` : `${d.remaining_z2_min} мин`} Z2 · ${d.remaining_z4_min} мин Z4`
-    : d.strain > d.target[1] ? "нагрузка выше оптимума — хватит" : "оптимум набран";
+    ? `До оптимума ≈ ${short(useZ2 ? d.remaining_z2_min : d.remaining_z4_min)} в ${useZ2 ? "Z2" : "Z4"}`
+    : d.strain > d.target[1] ? "Выше оптимума — на сегодня хватит" : "Оптимум набран";
   return (
     <div className={card} onClick={() => run(`open "$(cat "$HOME/.config/ironman-widget/url")"`)}>
       <div className={rings}>
-        <Ring value={d.recovery} max={100} color={ZONE[d.zone] || "#999"} label="Восст." sub={d.recovery != null ? "%" : ""} />
-        <Ring value={d.strain} max={21} color="#5aa0ff" label="Нагрузка" sub={`${d.target[0]}–${d.target[1]}`} band={d.target} />
+        <Ring value={d.recovery} max={100} color={ZONE[d.zone] || "#999"} label="Восстановл." unit={d.recovery != null ? "%" : ""} />
+        <Ring value={d.strain} max={21} color="#5aa0ff" label="Нагрузка" sub={`цель ${ru(d.target[0])}–${ru(d.target[1])}`} band={d.target} />
       </div>
       <div className={info}>
         {w ? (
           <div>
             <div className={title}>{SPORT[w.sport] || "•"} {w.title}{STATUS[w.status] ? ` ${STATUS[w.status]}` : ""}</div>
-            <div className={muted}>
-              {[w.distance_km && `${w.distance_km} км`, w.minutes && `≈${w.minutes} мин`, d.planned_strain && `нагрузка ≈${d.planned_strain}`].filter(Boolean).join(" · ")}
-              {d.over_plan ? " · выше оптимума" : ""}
-            </div>
+            <div className={muted}>{[w.minutes && `≈${w.minutes} мин`, d.planned_strain && `нагрузка ≈${ru(d.planned_strain)}`].filter(Boolean).join(" · ")}{d.over_plan ? " · много" : ""}</div>
           </div>
         ) : <div className={title}>Сегодня без тренировки</div>}
         <div className={line}>{left}</div>
-        <div className={foot}>
-          {d.hr_stale ? `⚠ пульс до ${d.hr_updated}` : `HRV ${Math.round(d.hrv || 0)}/${Math.round(d.hrv_base || 0)} · сон ${d.sleep_h ?? "—"} ч`}
-          {` · отбой ${d.bed_time || "—"}`}{d.bed_on_time === false ? "" : " ✓"}
-        </div>
-        <div className={foot}>{d.race} · {d.days_left} дн · CTL {d.ctl ?? "—"} · обн. {d.updated}</div>
+        <div className={foot}>{d.hr_stale ? `⚠ пульс до ${d.hr_updated}` : `HRV ${Math.round(d.hrv || 0)} · сон ${ru(d.sleep_h)} ч`} · отбой {d.bed_time || "—"}</div>
+        <div className={foot}>До старта {d.days_left} дн · CTL {d.ctl ?? "—"}</div>
       </div>
     </div>
   );
@@ -94,13 +93,14 @@ const card = css`
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 `;
-const rings = css`display: flex; gap: 4px; flex: none;`;
-const ringBox = css`display: flex; flex-direction: column; align-items: center; width: 72px;`;
-const ringVal = css`font: 700 19px -apple-system, system-ui; fill: #fff;`;
-const ringLabel = css`font-size: 11px; font-weight: 600; margin-top: 1px; opacity: .95;`;
-const ringSub = css`font-size: 10px; opacity: .7;`;
-const info = css`display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1;`;
+const rings = css`display: flex; gap: 6px; flex: none;`;
+const ringBox = css`display: flex; flex-direction: column; align-items: center; width: 66px;`;
+const ringVal = css`font: 700 17px -apple-system, system-ui; fill: #fff;`;
+const ringUnit = css`font-size: 10px; font-weight: 600;`;
+const ringLabel = css`font-size: 10.5px; font-weight: 600; margin-top: 2px; opacity: .95; white-space: nowrap;`;
+const ringSub = css`font-size: 9.5px; opacity: .7; white-space: nowrap;`;
+const info = css`display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1;`;
 const title = css`font-size: 14px; font-weight: 650; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`;
-const line = css`font-size: 12px; font-weight: 500; opacity: .95;`;
-const muted = css`font-size: 11.5px; opacity: .78; margin-top: 2px;`;
+const line = css`font-size: 12px; font-weight: 600; opacity: .95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`;
+const muted = css`font-size: 11.5px; opacity: .78; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`;
 const foot = css`font-size: 10.5px; opacity: .68; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`;
