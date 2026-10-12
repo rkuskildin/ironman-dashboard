@@ -110,6 +110,8 @@ def sync_api(days_back: int, days_forward: int) -> str:
         for w in tp.workouts(start, end):
             d = (w.get("workoutDay") or "")[:10]
             sport = TP_SPORT.get(w.get("workoutTypeValueId"), "other")
+            if (w.get("title") or "").strip().lower() in ("transition", "t1", "t2", "переход"):
+                sport = "transition"
             wid = str(w["workoutId"])
             if w.get("totalTimePlanned") or w.get("tssPlanned") or w.get("distancePlanned") or sport == "rest":
                 db.upsert(c, "planned_workouts", {

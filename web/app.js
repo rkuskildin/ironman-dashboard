@@ -8,6 +8,7 @@ const ICONS = {
   hockey: '<path d="M8 3l6 13a2 2 0 0 0 1.8 1.2H21"/><ellipse cx="7" cy="18.5" rx="3.5" ry="1.6"/>',
   football: '<circle cx="12" cy="12" r="9"/><path d="m12 7.5 3.2 2.3-1.2 3.8h-4l-1.2-3.8z"/><path d="M12 3v4.5M15.2 9.8l4.5-1.6M14 13.6l2.7 3.9M10 13.6l-2.7 3.9M8.8 9.8 4.3 8.2"/>',
   other: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/>',
+  transition: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
   rest: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2.5v3M8 2.5v3M3 9.5h18"/>',
@@ -32,7 +33,7 @@ const ICONS = {
 const icon = (name, cls = "") => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.other}</svg>`;
 const SPORT = {
   swim: { name: "Плавание" }, bike: { name: "Велосипед" }, run: { name: "Бег" }, strength: { name: "Силовая" },
-  hockey: { name: "Хоккей" }, football: { name: "Футбол" }, other: { name: "Другое" }, rest: { name: "Отдых" },
+  hockey: { name: "Хоккей" }, football: { name: "Футбол" }, transition: { name: "Переход" }, other: { name: "Другое" }, rest: { name: "Отдых" },
 };
 for (const k in SPORT) SPORT[k].ico = icon(k);
 const sportColor = (s) => `var(--${s in SPORT && !["rest", "other"].includes(s) ? s : "other"})`;
@@ -614,7 +615,7 @@ async function renderCalendar() {
     ${lanesLegend()}
     <div style="margin-top:14px">
     ${days.map((d) => `<div class="cal-day ${d.date === todayIso ? "is-today" : ""}">
-        <div class="head"><b>${fmtDay(d.date)}${d.date === todayIso ? " · сегодня" : ""}</b>
+        <div class="head"><b>${fmtDay(d.date)}${d.date === todayIso ? " · сегодня" : ""}${d.items.some((i) => i.actual?.kind === "leg") ? ` <span class="pill race-pill-sm">${icon("flag")}Старт</span>` : ""}</b>
           <span class="muted num" style="font-size:12px">${d.items.some((i) => i.actual) ? `${fmtDur(d.items.reduce((s, i) => s + (i.actual?.duration_s || 0), 0))} · ${n0(d.items.reduce((s, i) => s + (i.actual?.tss || 0), 0))} TSS` : ""}</span></div>
         <div class="card">${d.items.length ? d.items.map(workoutRow).join("") : `<div class="empty">Ничего не запланировано</div>`}</div>
       </div>`).join("")}
@@ -821,9 +822,11 @@ async function renderGoalSummary(el, tabs) {
           <button class="btn primary" type="submit">Сохранить цель</button>
         </form></div>
       <div class="card"><div class="card-h"><h3>${icon("flag")}Прошедшие старты</h3></div>
-        ${s.races.length ? s.races.map((r) => `<div class="src-tag">${fmtShort(r.date)} ${r.date.slice(0, 4)} · ${hm(r.legs.reduce((a, l) => a + l.time_s, 0))} без переходов</div>
-          <table class="data num"><tbody>${r.legs.map((l) => `<tr><td><span class="sport-cell" style="--c:${sportColor(l.sport)}">${icon(l.sport)}${DISC[l.sport].name}</span></td>
-            <td>${km(l.distance_m, l.sport)}</td><td>${hms(l.time_s)}</td><td>${fmtPaceS(l.sport, l.time_s / (l.distance_m / (l.sport === "swim" ? 100 : 1000)))}</td><td>${l.avg_hr ? n0(l.avg_hr) + " уд" : ""}</td></tr>`).join("")}</tbody></table>`).join("")
+        ${s.races.length ? s.races.map((r) => `<div class="src-tag">${fmtShort(r.date)} ${r.date.slice(0, 4)}${r.title ? " · " + esc(r.title) : ""} · итог <b style="color:var(--ink)">${hms(r.total_s)}</b></div>
+          <table class="data num" style="margin-bottom:14px"><tbody>${r.legs.map((l) => `<tr><td><span class="sport-cell" style="--c:${sportColor(l.sport)}">${icon(l.sport)}${l.label || DISC[l.sport]?.name || SPORT[l.sport]?.name}</span></td>
+            <td>${l.sport === "transition" ? "" : km(l.distance_m, l.sport)}</td><td>${hms(l.time_s)}</td>
+            <td>${l.sport === "transition" || !l.distance_m ? "" : fmtPaceS(l.sport, l.time_s / (l.distance_m / (l.sport === "swim" ? 100 : 1000)))}</td>
+            <td>${l.avg_hr ? n0(l.avg_hr) + " уд" : ""}</td><td>${l.te ? "TE " + (+l.te).toFixed(1) : ""}</td></tr>`).join("")}</tbody></table>`).join("")
           : `<div class="empty">Стартов пока не найдено</div>`}
         <div class="muted" style="font-size:12.5px;margin-top:12px">Прогноз по плаванию и велосипеду — по лучшей четверти ваших тренировок с поправкой на дистанцию (формула Ригеля),
           по бегу — прогноз Garmin на марафон × 1,12 на усталость после велоэтапа. Чем больше тренировок, тем точнее.</div>

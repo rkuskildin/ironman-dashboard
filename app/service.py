@@ -89,6 +89,7 @@ def garmin_status() -> dict | None:
 def activities(start: str, end: str) -> list[dict]:
     """Garmin — первичный источник факта; из TP берём TSS и комментарии, дубли сливаем."""
     rows = _rows("SELECT * FROM activities WHERE date BETWEEN ? AND ? ORDER BY start_time", start, end)
+    rows = [r for r in rows if r.get("kind") != "multisport_parent"]  # этапы старта идут отдельными записями
     rows = [r for r in rows if r["source"] != "fitbit" or not _overlaps_recorded(r, rows)]
     primary = [r for r in rows if r["source"] != "tp"]
     for tp in (r for r in rows if r["source"] == "tp"):

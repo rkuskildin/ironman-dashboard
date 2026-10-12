@@ -96,7 +96,7 @@ def sync_activities(g, start: date) -> int:
         for a in acts:
             st = a.get("startTimeLocal") or ""
             sid = str(a["activityId"])
-            prev = c.execute("SELECT fitbit_avg_hr, fitbit_max_hr FROM activities WHERE source='garmin' AND source_id=?",
+            prev = c.execute("SELECT fitbit_avg_hr, fitbit_max_hr, kind FROM activities WHERE source='garmin' AND source_id=?",
                              (sid,)).fetchone()
             db.upsert(c, "activities", {
                 "source": "garmin", "source_id": sid, "date": st[:10],
@@ -113,8 +113,52 @@ def sync_activities(g, start: date) -> int:
                 "tss": a.get("trainingStressScore"), "calories": a.get("calories"),
                 "athlete_comments": a.get("description"),
                 "analysis": json.dumps(_analysis(a)),
+                "kind": prev["kind"] if prev else None,
             })
+    # мультиспорт (триатлон): забираем этапы — плавание, переходы, вело, бег
+    for a in acts:
+        if (a.get("activityType") or {}).get("typeKey") in ("multi_sport", "multisport") or a.get("parent"):
+            try:
+                _sync_children(g, a)
+            except Exception:
+                pass
     return len(acts)
+
+
+def _sync_children(g, parent: dict):
+    pid = str(parent["activityId"])
+    with db.session() as c:
+        c.execute("UPDATE activities SET kind='multisport_parent' WHERE source='garmin' AND source_id=?", (pid,))
+        have = {r[0] for r in c.execute("SELECT source_id FROM activities WHERE source='garmin' AND parent_id=?", (pid,))}
+    md = (g.get_activity(pid) or {}).get("metadataDTO") or {}
+    for cid in md.get("childIds") or []:
+        cid = str(cid)
+        if cid in have:
+            continue
+        d = g.get_activity(cid) or {}
+        sm = d.get("summaryDTO") or {}
+        key = (d.get("activityTypeDTO") or {}).get("typeKey") or ""
+        sport = normalize_sport(key)
+        st = (sm.get("startTimeLocal") or "").replace("T", " ")[:19]
+        an = {
+            "aerobic_te": sm.get("trainingEffect"), "anaerobic_te": sm.get("anaerobicTrainingEffect"),
+            "te_label": sm.get("trainingEffectLabel"), "aerobic_msg": sm.get("aerobicTrainingEffectMessage"),
+            "anaerobic_msg": sm.get("anaerobicTrainingEffectMessage"), "training_load": sm.get("activityTrainingLoad"),
+            "body_battery_diff": sm.get("differenceBodyBattery"),
+        }
+        with db.session() as c:
+            db.upsert(c, "activities", {
+                "source": "garmin", "source_id": cid, "date": st[:10], "start_time": st,
+                "start_gmt": (sm.get("startTimeGMT") or "").replace("T", " ")[:19] or None,
+                "sport": sport, "title": d.get("activityName") or parent.get("activityName"),
+                "duration_s": sm.get("duration"), "moving_s": sm.get("movingDuration"),
+                "distance_m": sm.get("distance"), "elevation_m": sm.get("elevationGain"),
+                "avg_hr": sm.get("averageHR"), "max_hr": sm.get("maxHR"),
+                "avg_power": sm.get("averagePower"), "np": sm.get("normalizedPower"),
+                "tss": sm.get("trainingStressScore"), "calories": sm.get("calories"),
+                "has_gps": 1 if parent.get("hasPolyline") and sport in ("swim", "bike", "run") else 0,
+                "parent_id": pid, "kind": "leg", "analysis": json.dumps(an),
+            })
 
 
 def sync(days_back: int) -> str:

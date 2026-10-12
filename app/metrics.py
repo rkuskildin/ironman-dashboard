@@ -17,6 +17,10 @@ def normalize_sport(raw: str | None) -> str:
         return "swim"
     if any(k in s for k in ("bike", "cycl", "ride", "вело", "biking", "virtual_ride", "mtb")):
         return "bike"
+    if "transition" in s or "переход" in s:
+        return "transition"
+    if "multi_sport" in s or "multisport" in s or "triathlon" in s:
+        return "multisport"
     if "hockey" in s or "хоккей" in s:
         return "hockey"
     if any(k in s for k in ("football", "soccer", "футбол")):

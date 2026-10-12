@@ -193,15 +193,30 @@ def summary() -> dict:
 
 
 def _races() -> list[dict]:
-    """Прошедшие старты: дни, когда в TP есть переходы (Transition) или мультиспорт в Garmin."""
+    """Прошедшие старты: мультиспорт Garmin (этапы + переходы) или дни с переходами в TrainingPeaks."""
     with db.session() as c:
-        days = [r["date"] for r in c.execute(
-            "SELECT DISTINCT date FROM activities WHERE lower(title) LIKE '%transition%' OR lower(title) LIKE '%multisport%' "
-            "ORDER BY date DESC LIMIT 5")]
-    out = []
-    for d in days:
-        legs = [a for a in service.activities(d, d) if a["sport"] in ("swim", "bike", "run")]
-        if legs:
-            out.append({"date": d, "legs": [{"sport": a["sport"], "distance_m": a["distance_m"],
-                                             "time_s": _moving(a), "avg_hr": a["avg_hr"]} for a in legs]})
+        parents = [dict(r) for r in c.execute(
+            "SELECT date, title, source_id FROM activities WHERE source='garmin' AND kind='multisport_parent' ORDER BY date DESC LIMIT 10")]
+        tp_days = [r["date"] for r in c.execute(
+            "SELECT DISTINCT date FROM activities WHERE sport='transition' ORDER BY date DESC LIMIT 10")]
+    out, seen = [], set()
+    for p in parents + [{"date": d, "title": None} for d in tp_days]:
+        if p["date"] in seen:
+            continue
+        seen.add(p["date"])
+        legs = sorted([a for a in service.activities(p["date"], p["date"]) if a["sport"] in ("swim", "bike", "run", "transition")],
+                      key=lambda a: a.get("start_time") or "")
+        if not any(a["sport"] != "transition" for a in legs):
+            continue
+        t = 0
+        rows = []
+        for a in legs:
+            dur = a.get("duration_s") or _moving(a)
+            t += dur or 0
+            rows.append({"sport": a["sport"], "distance_m": a["distance_m"], "time_s": dur, "avg_hr": a["avg_hr"],
+                         "te": (a.get("analysis") or {}).get("aerobic_te"), "source": a["source"], "source_id": a["source_id"]})
+        n_tr = sum(1 for r in rows if r["sport"] == "transition")
+        for i, r in enumerate([r for r in rows if r["sport"] == "transition"]):
+            r["label"] = f"T{i + 1}"
+        out.append({"date": p["date"], "title": p.get("title"), "total_s": round(t), "legs": rows, "transitions": n_tr})
     return out

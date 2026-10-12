@@ -95,7 +95,7 @@ def session():
 MIGRATIONS = {
     "daily_health": {"bed_time": "TEXT", "wake_time": "TEXT"},
     "activities": {"start_gmt": "TEXT", "fitbit_avg_hr": "REAL", "fitbit_max_hr": "REAL", "analysis": "TEXT",
-                   "moving_s": "REAL", "has_gps": "INTEGER"},
+                   "moving_s": "REAL", "has_gps": "INTEGER", "parent_id": "TEXT", "kind": "TEXT"},
 }
 
 
