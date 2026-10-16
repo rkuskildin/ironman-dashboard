@@ -293,6 +293,9 @@ def overview() -> dict:
         alerts.append(f"Режим: лёг в {reg['last']['bed_time']} — на {late} позже {reg['target']}")
     if fit and fit[-1]["tsb"] < -30:
         alerts.append(f"Высокая усталость: TSB {fit[-1]['tsb']}")
+    from .connectors import fitbit as _fb
+    if not _fb.connected() and config.FITBIT_TOKEN_FILE.with_suffix(".expired").exists():
+        alerts.append("Fitbit отключился: вход в Google истёк — «Источники» → «Подключить»")
     missed = [i for i in items if i["status"] == "missed"]
     if missed:
         alerts.append(f"Пропущено на этой неделе: {len(missed)}")

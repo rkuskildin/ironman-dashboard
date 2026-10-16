@@ -44,6 +44,10 @@ def _token_request(data: dict) -> dict:
     r = httpx.post(TOKEN_URL, data={"client_id": config.GOOGLE_HEALTH_CLIENT_ID,
                                     "client_secret": config.GOOGLE_HEALTH_CLIENT_SECRET, **data}, timeout=30)
     if r.status_code != 200:
+        if "invalid_grant" in r.text and config.FITBIT_TOKEN_FILE.exists():
+            # вход истёк (в тестовом режиме Google — раз в 7 дней): убираем токен, чтобы панель предложила «Подключить»
+            config.FITBIT_TOKEN_FILE.rename(config.FITBIT_TOKEN_FILE.with_suffix(".expired"))
+            raise RuntimeError("Вход в Google истёк — переподключите Fitbit: «Источники» → «Подключить»")
         raise RuntimeError(f"Google OAuth: {r.text[:200]}")
     tok = r.json()
     old = json.loads(config.FITBIT_TOKEN_FILE.read_text()) if config.FITBIT_TOKEN_FILE.exists() else {}
