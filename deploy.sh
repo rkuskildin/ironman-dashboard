@@ -8,5 +8,5 @@ HOST=${DEPLOY_HOST:-ironman}
 [[ -z "$PUBLIC_URL" && -f .env ]] && PUBLIC_URL=$(grep -E '^PUBLIC_URL=' .env | cut -d= -f2-)
 rsync -az --delete --exclude '.venv' --exclude '__pycache__' --exclude 'data/' --exclude '.env' \
   --exclude '.git' --exclude '.DS_Store' --exclude 'deploy.sh' ./ "$HOST":/opt/ironman/app/
-ssh "$HOST" 'chown -R ironman:ironman /opt/ironman/app && systemctl restart ironman && sleep 3 && systemctl is-active ironman'
+ssh "$HOST" 'chown -R ironman:ironman /opt/ironman/app && systemctl restart ironman && for i in $(seq 20); do curl -s -o /dev/null http://127.0.0.1:8000/login && break; sleep 1; done; systemctl is-active ironman'
 [[ -n "$PUBLIC_URL" ]] && curl -s -o /dev/null -w "$PUBLIC_URL → %{http_code}\n" "$PUBLIC_URL/login"

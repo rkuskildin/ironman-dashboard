@@ -574,3 +574,13 @@ tr.cur-row td { background: var(--accent-soft); }
 .stale b { color: inherit; }
 .race-pill-sm { margin-left: 8px; background: var(--good-soft); color: var(--good-ink); padding: 2px 9px; vertical-align: 1px; }
 .race-pill-sm .ico { width: 12px; height: 12px; }
+
+/* ============ плавание: отрезки ============ */
+.lengths { display: flex; align-items: flex-end; gap: 2px; height: 90px; padding: 4px 0; border-bottom: 1px solid var(--axis); }
+.len { flex: 1 1 0; min-width: 3px; border-radius: 3px 3px 0 0; position: relative; }
+.len.rest { background: var(--surface-3); }
+.len.bad { outline: 2px solid var(--critical); outline-offset: -2px; }
+.len i { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 10px; color: var(--bad-ink); }
+.swim-fix { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 12px; font-size: 13px; }
+.swim-fix label { display: inline-flex; align-items: center; gap: 6px; }
+.swim-fix input[type=number] { font: inherit; color: var(--ink); background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; }
