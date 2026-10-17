@@ -104,9 +104,17 @@ def activities(start: str, end: str) -> list[dict]:
     _attach_analysis(primary)
     from . import manual
     from .extras import excluded_set
+    from . import swim
     excl = excluded_set()
+    sfix = swim.fixes()
     for r in primary:
         r["excluded"] = (r["source"], r["source_id"]) in excl
+        sw = (r.get("analysis") or {}).get("swim")
+        if sw:
+            r["swim"] = swim.analyze(sw, sfix.get(f'{r["source"]}:{r["source_id"]}'))
+            if r["swim"]["fixed_distance"]:
+                r["garmin_distance_m"] = r["distance_m"]
+                r["distance_m"] = r["swim"]["fixed_distance"]
     for r in primary:
         if r["source"] == "manual" and r.get("analysis"):  # пересчёт по текущим порогам
             r["tss"], r["analysis"]["hr_zones"] = manual.recompute(r["analysis"])

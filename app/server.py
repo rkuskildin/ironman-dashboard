@@ -43,7 +43,7 @@ app = FastAPI(title="Ironman Dashboard", lifespan=lifespan, docs_url=None, redoc
 PUBLIC = {"/login", "/api/login", "/setup", "/api/setup", "/api/invite", "/api/widget", "/styles.css", "/manifest.webmanifest", "/sw.js"}
 PUBLIC_PREFIX = ("/icons/",)
 # Тренер видит всё, но не меняет данные и не трогает подключения спортсмена
-COACH_DENY = (("PUT", "/api/goals"), ("PUT", "/api/thresholds"), ("PUT", "/api/race"), ("POST", "/api/weight"),
+COACH_DENY = (("POST", "/api/swim-fix"), ("PUT", "/api/goals"), ("PUT", "/api/thresholds"), ("PUT", "/api/race"), ("POST", "/api/weight"),
               ("POST", "/api/exclude"), ("POST", "/api/manual"), ("DELETE", "/api/manual"), ("GET", "/api/fitbit"))
 
 
@@ -336,6 +336,15 @@ def widget(token: str = ""):
     if not auth.check_widget_token(token):
         raise HTTPException(401, "Неверный ключ виджета")
     return recovery.widget_summary()
+
+
+@app.post("/api/swim-fix/{source}/{source_id}")
+def swim_fix(source: str, source_id: str, body: dict):
+    from . import swim
+    pool = body.get("pool_m")
+    dist = body.get("distance_m")
+    swim.set_fix(source, source_id, float(pool) if pool else None, float(dist) if dist else None)
+    return {"ok": True}
 
 
 @app.get("/api/status")

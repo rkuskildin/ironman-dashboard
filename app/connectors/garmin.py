@@ -96,8 +96,8 @@ def sync_activities(g, start: date) -> int:
         for a in acts:
             st = a.get("startTimeLocal") or ""
             sid = str(a["activityId"])
-            prev = c.execute("SELECT fitbit_avg_hr, fitbit_max_hr, kind FROM activities WHERE source='garmin' AND source_id=?",
-                             (sid,)).fetchone()
+            prev = c.execute("SELECT fitbit_avg_hr, fitbit_max_hr, kind, json_extract(analysis, '$.swim') AS swim "
+                             "FROM activities WHERE source='garmin' AND source_id=?", (sid,)).fetchone()
             db.upsert(c, "activities", {
                 "source": "garmin", "source_id": sid, "date": st[:10],
                 "start_time": st, "start_gmt": a.get("startTimeGMT"),
@@ -112,9 +112,16 @@ def sync_activities(g, start: date) -> int:
                 "avg_power": a.get("avgPower"), "np": a.get("normPower"),
                 "tss": a.get("trainingStressScore"), "calories": a.get("calories"),
                 "athlete_comments": a.get("description"),
-                "analysis": json.dumps(_analysis(a)),
+                "analysis": json.dumps({**_analysis(a), **({"swim": json.loads(prev["swim"])} if prev and prev["swim"] else {})}),
                 "kind": prev["kind"] if prev else None,
             })
+    # бассейн: отрезки, гребки, SWOLF — один раз на тренировку
+    for a in acts:
+        if (a.get("activityType") or {}).get("typeKey") == "lap_swimming":
+            try:
+                _sync_swim(g, a)
+            except Exception:
+                pass
     # мультиспорт (триатлон): забираем этапы — плавание, переходы, вело, бег
     for a in acts:
         if (a.get("activityType") or {}).get("typeKey") in ("multi_sport", "multisport") or a.get("parent"):
@@ -123,6 +130,27 @@ def sync_activities(g, start: date) -> int:
             except Exception:
                 pass
     return len(acts)
+
+
+def _sync_swim(g, a: dict):
+    sid = str(a["activityId"])
+    with db.session() as c:
+        row = c.execute("SELECT analysis FROM activities WHERE source='garmin' AND source_id=?", (sid,)).fetchone()
+    an = json.loads(row["analysis"]) if row and row["analysis"] else {}
+    if an.get("swim"):
+        return
+    sp = g.get_activity_splits(sid) or {}
+    lengths = []
+    for lap_i, lap in enumerate(sp.get("lapDTOs") or []):
+        for ln in lap.get("lengthDTOs") or []:
+            lengths.append({"i": ln.get("lengthIndex"), "lap": lap_i + 1, "t": round(ln.get("duration") or 0, 1),
+                            "strokes": ln.get("totalNumberOfStrokes"), "swolf": ln.get("averageSWOLF"),
+                            "style": ln.get("swimStroke")})
+    an["swim"] = {"pool_m": (a.get("poolLength") or 0) / 100 or None, "lengths": lengths,
+                  "strokes": a.get("strokes"), "swolf": a.get("averageSwolf"), "avg_strokes": a.get("avgStrokes"),
+                  "intervals": len(sp.get("lapDTOs") or [])}
+    with db.session() as c:
+        c.execute("UPDATE activities SET analysis=? WHERE source='garmin' AND source_id=?", (json.dumps(an), sid))
 
 
 def _sync_children(g, parent: dict):
