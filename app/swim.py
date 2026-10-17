@@ -42,7 +42,7 @@ def analyze(sw: dict, fix: dict | None = None) -> dict:
     for l in lengths:
         flag, k = None, 1
         if not l.get("strokes"):
-            flag, k = "отдых засчитан как отрезок", 0
+            flag, k = "пауза — в дистанцию не входит", 0
         elif med_s and l["strokes"] >= 1.6 * med_s and l["t"] >= 1.5 * med_t:
             k = max(2, round(l["strokes"] / med_s))
             flag = f"пропущен разворот: похоже на {k} отрезка"
@@ -60,15 +60,17 @@ def analyze(sw: dict, fix: dict | None = None) -> dict:
         pool_hint = f"В среднем {med_s:g} гребков на отрезок — это похоже на бассейн 25 м, а в часах стоит 50 м"
     elif med_s and (sw.get("pool_m") or 0) and sw["pool_m"] <= 25 and med_s >= 20:
         pool_hint = f"В среднем {med_s:g} гребков на отрезок — это похоже на бассейн 50 м, а в часах стоит 25 м"
-    garmin_dist = len(lengths) * (sw.get("pool_m") or pool)
+    active = len(stroked)
+    garmin_dist = active * (sw.get("pool_m") or pool)
     est_dist = est * pool
     final = (fix or {}).get("distance_m") or (est_dist if fix else None)
     swolfs = [l["swolf"] for l in stroked if l.get("swolf") and not any(r["i"] == l["i"] and r["flag"] for r in rows)]
     return {
-        "pool_m": sw.get("pool_m"), "pool_used": pool, "garmin_lengths": len(lengths), "garmin_distance": garmin_dist,
+        "pool_m": sw.get("pool_m"), "pool_used": pool, "garmin_lengths": active, "garmin_distance": garmin_dist,
+        "est_25": est * 25, "est_50": est * 50,
         "est_lengths": est, "est_distance": est_dist, "fixed_distance": final,
-        "strokes": sw.get("strokes"), "avg_strokes": round(med_s) if med_s else None,
+        "strokes": sw.get("strokes"), "avg_strokes": round(med_s) if med_s else None, "intervals": sw.get("intervals"),
         "swolf": sw.get("swolf"), "swolf_clean": round(median(swolfs)) if swolfs else None,
         "styles": styles, "rest_counted": sum(1 for r in rows if not r.get("strokes")),
-        "suspicious": sum(1 for r in rows if r["flag"]), "pool_hint": pool_hint, "lengths": rows, "fix": fix,
+        "suspicious": sum(1 for r in rows if r["flag"] and r.get("strokes")), "pool_hint": pool_hint, "lengths": rows, "fix": fix,
     }
