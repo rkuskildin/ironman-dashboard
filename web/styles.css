@@ -583,4 +583,4 @@ tr.cur-row td { background: var(--accent-soft); }
 .len i { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 10px; color: var(--bad-ink); }
 .swim-fix { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 12px; font-size: 13px; }
 .swim-fix label { display: inline-flex; align-items: center; gap: 6px; }
-.swim-fix input[type=number] { font: inherit; color: var(--ink); background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; }
+.swim-fix input[type=number], .swim-fix select { font: inherit; color: var(--ink); background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; }

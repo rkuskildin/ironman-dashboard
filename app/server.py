@@ -341,9 +341,8 @@ def widget(token: str = ""):
 @app.post("/api/swim-fix/{source}/{source_id}")
 def swim_fix(source: str, source_id: str, body: dict):
     from . import swim
-    pool = body.get("pool_m")
-    dist = body.get("distance_m")
-    swim.set_fix(source, source_id, float(pool) if pool else None, float(dist) if dist else None)
+    num = lambda k: float(body[k]) if body.get(k) not in (None, "") else None
+    swim.set_fix(source, source_id, num("pool_m"), num("distance_m"), num("spl"))
     return {"ok": True}
 
 

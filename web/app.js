@@ -106,36 +106,40 @@ const STYLE_COL = { "кроль": "var(--swim)", "брасс": "var(--run)", "н
 function swimBlock(a) {
   const s = a?.swim; if (!s) return "";
   const maxT = Math.max(...s.lengths.map((l) => l.t || 0), 1);
-  const fixed = s.fix && s.fixed_distance;
+  const pool = s.pool_used;
   return `<div class="analysis swim-block"><div class="row-between" style="margin-bottom:8px"><b>Плавание: отрезки, гребки, SWOLF</b>
-      <span class="pill">${s.pool_m ? `бассейн в часах ${s.pool_m} м` : ""}</span></div>
+      <span class="pill">бассейн ${pool} м</span></div>
     <div class="grid g4 an-cells" style="margin-top:0">
-      <div class="stat"><div class="label">Гребков всего</div><div class="value num" style="font-size:20px">${n0(s.strokes)}</div><div class="delta">≈${s.avg_strokes ?? "—"} на отрезок</div></div>
-      <div class="stat"><div class="label">SWOLF</div><div class="value num" style="font-size:20px">${s.swolf_clean ?? s.swolf ?? "—"}</div><div class="delta">по чистым отрезкам · Garmin ${s.swolf ?? "—"}</div></div>
-      <div class="stat"><div class="label">Отрезков</div><div class="value num" style="font-size:20px">${s.garmin_lengths}</div><div class="delta">${s.rest_counted} пауз · ${s.suspicious} подозрительных</div></div>
-      <div class="stat"><div class="label">Стиль</div><div class="value" style="font-size:15px;line-height:1.35">${Object.entries(s.styles).map(([k, v]) => `${esc(k)} ${v}`).join("<br>")}</div></div>
+      <div class="stat"><div class="label">Гребков всего</div><div class="value num" style="font-size:20px">${n0(s.strokes)}</div>
+        <div class="delta">${s.spl ? `≈${s.spl} на ${pool} м (ваши)` : `у Garmin ≈${s.avg_strokes ?? "—"} на отрезок`}</div></div>
+      <div class="stat"><div class="label">SWOLF на ${pool} м</div><div class="value num" style="font-size:20px">${s.swolf_real ?? "—"}</div>
+        <div class="delta">${s.swolf_real ? "время отрезка + гребки" : `у Garmin ${s.swolf ?? "—"} — по его отрезкам`}</div></div>
+      <div class="stat"><div class="label">Отрезков по ${pool} м</div><div class="value num" style="font-size:20px">${s.est_lengths ?? s.garmin_lengths}</div>
+        <div class="delta">${s.est_lengths ? `у Garmin ${s.garmin_lengths}` : `${s.rest_counted} пауз`}</div></div>
+      <div class="stat"><div class="label">Дистанция</div><div class="value num" style="font-size:20px">${n0(s.fixed_distance || s.est_distance || s.garmin_distance)}<small>м</small></div>
+        <div class="delta">${s.fixed_distance || s.est_distance ? `у Garmin ${n0(s.garmin_distance)} м` : "по данным Garmin"} · ${Object.entries(s.styles).map(([k, v]) => `${esc(k)} ${v}`).join(", ")}</div></div>
     </div>
-    ${s.pool_hint ? `<div class="stale" style="margin-top:12px">${icon("alert")}<span>${esc(s.pool_hint)}. Тогда дистанция ≈ <b>${n0(s.est_25)} м</b>, а не ${n0(s.garmin_distance)} м.</span></div>` : ""}
-    <div class="zl" style="margin-top:12px">Отрезки по порядку · высота — время, цвет — стиль · ⚠ — часы, скорее всего, ошиблись (наведите)</div>
+    ${s.pool_hint ? `<div class="stale" style="margin-top:12px">${icon("alert")}<span>${esc(s.pool_hint)}</span></div>` : ""}
+    <div class="zl" style="margin-top:12px">Отрезки, как их записали часы · высота — время, цвет — стиль${s.spl ? " · ⚠ — вероятная ошибка часов (наведите)" : ""}</div>
     <div class="lengths">${s.lengths.map((l) => `<span class="len ${l.strokes ? "" : "rest"} ${l.flag && l.strokes ? "bad" : ""}"
         style="height:${Math.max(8, (l.t / maxT) * 100)}%;${l.strokes ? `background:${STYLE_COL[l.style_ru] || "var(--other)"}` : ""}"
-        title="${l.i}: ${l.t} с${l.strokes ? `, ${l.strokes} гребков, SWOLF ${l.swolf ?? "—"}, ${l.style_ru}` : ""}${l.flag ? " — " + l.flag : ""}">${l.flag && l.strokes ? "<i>⚠</i>" : ""}</span>`).join("")}</div>
+        title="${l.i}: ${l.t} с${l.strokes ? `, ${l.strokes} гребков, ${l.style_ru}` : ""}${l.flag ? " — " + l.flag : ""}">${l.flag && l.strokes ? "<i>⚠</i>" : ""}</span>`).join("")}</div>
     <div class="legend" style="margin-top:6px">${Object.entries(STYLE_COL).filter(([k]) => s.styles[k]).map(([k, c]) => `<span><i class="sw" style="background:${c}"></i>${k}</span>`).join("")}
       <span><i class="sw" style="background:var(--surface-3)"></i>пауза</span></div>
     <form class="swim-fix athlete-only" onsubmit="event.preventDefault();fixSwim(this,'${esc(a.source)}','${esc(a.source_id)}')">
-      <span>Исправить:</span>
-      <label><input type="radio" name="pool" value="25" ${s.pool_used == 25 && s.fix ? "checked" : ""}> бассейн 25 м (≈${n0(s.est_25)} м)</label>
-      <label><input type="radio" name="pool" value="50" ${s.pool_used == 50 && s.fix ? "checked" : ""}> 50 м (≈${n0(s.est_50)} м)</label>
+      <label>Бассейн <select name="pool">${[25, 50].map((v) => `<option value="${v}" ${v == pool ? "selected" : ""}>${v} м</option>`).join("")}</select></label>
+      <label>моих гребков на отрезок <input name="spl" type="number" step="0.5" value="${s.spl || ""}" placeholder="напр. 36" style="width:80px"></label>
       <label>или дистанция <input name="dist" type="number" step="25" placeholder="м" value="${s.fix?.distance_m || ""}" style="width:80px"></label>
-      <button class="btn primary" type="submit">Применить</button>
+      <button class="btn primary" type="submit">Пересчитать</button>
       ${s.fix ? `<button class="btn" type="button" onclick="fixSwim(null,'${esc(a.source)}','${esc(a.source_id)}')">Как в Garmin</button>` : ""}
     </form>
-    ${fixed ? `<div class="muted" style="font-size:12px;margin-top:6px">Исправлено: ${n0(s.fixed_distance)} м вместо ${n0(s.garmin_distance)} м — темп, рекорды и прогноз считаются по исправленной дистанции</div>` : ""}
+    ${s.fixed_distance ? `<div class="muted" style="font-size:12px;margin-top:6px">Темп, рекорды и прогноз считаются по ${n0(s.fixed_distance)} м вместо ${n0(s.garmin_distance)} м.
+      Число гребков на отрезок запомнено — на следующих тренировках в этом бассейне пересчёт подскажется сам.</div>` : ""}
   </div>`;
 }
 async function fixSwim(form, src, id) {
-  const body = form ? { pool_m: form.pool.value || null, distance_m: form.dist.value || null } : {};
-  if (form && !body.pool_m && !body.distance_m) return toast("Выберите длину бассейна или впишите дистанцию");
+  const body = form ? { pool_m: form.pool.value || null, distance_m: form.dist.value || null, spl: form.spl.value || null } : {};
+  if (form && !body.spl && !body.distance_m) return toast("Впишите гребки на отрезок или дистанцию");
   await api(`swim-fix/${encodeURIComponent(src)}/${encodeURIComponent(id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   toast(form ? "Дистанция исправлена" : "Вернул данные Garmin"); route();
 }
@@ -279,7 +283,7 @@ function workoutRow(row) {
     : `план ${fmtDur(p.duration_s)}${p.tss ? ` · ${Math.round(p.tss)} TSS` : ""}`);
   if (a) meta.push(`факт ${a.distance_m ? fmtDist(a.distance_m, row.sport) + " · " : ""}${fmtDur(a.duration_s)}${a.tss ? ` · ${Math.round(a.tss)} TSS` : ""}`);
   if (row.moved_to) meta.push(`выполнено ${fmtShort(row.moved_to)}`);
-  if (a?.swim) meta.push(`SWOLF ${a.swim.swolf_clean ?? a.swim.swolf ?? "—"} · ${n0(a.swim.strokes)} гребков${a.swim.pool_hint && !a.swim.fix ? " · ⚠ проверьте бассейн" : ""}`);
+  if (a?.swim) meta.push(`${n0(a.swim.strokes)} гребков${a.swim.swolf_real ? ` · SWOLF ${a.swim.swolf_real}` : ""}${a.swim.pool_hint ? " · ⚠ проверьте отрезки" : ""}`);
   if (a?.analysis?.aerobic_te != null) meta.push(`TE ${a.analysis.aerobic_te.toFixed(1)}${TE_LABEL[a.analysis.te_label] ? " · " + TE_LABEL[a.analysis.te_label] : ""}`);
   const lines = [
     ["Длительность", (p?.duration_estimated ? "≈" : "") + fmtDur(p?.duration_s), fmtDur(a?.duration_s)],
