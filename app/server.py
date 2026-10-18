@@ -11,16 +11,32 @@ from pydantic import BaseModel
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import auth, config, db, extras, goals, manual, recovery, service, sync, thresholds
+from . import auth, config, db, extras, goals, manual, race_calendar, recovery, service, sync, thresholds
 from .connectors import fitbit
 
 WEB = config.ROOT / "web"
+
+
+_races_running = False
+
+
+async def _refresh_races():
+    global _races_running
+    if _races_running:
+        return
+    _races_running = True
+    try:
+        await asyncio.to_thread(race_calendar.refresh)
+    finally:
+        _races_running = False
 
 
 async def _background_sync():
     while True:
         await asyncio.sleep(config.SYNC_INTERVAL_MIN * 60)
         await asyncio.to_thread(sync.run)
+        if race_calendar.due():  # календарь стартов — раз в сутки ночью
+            asyncio.create_task(_refresh_races())
 
 
 @asynccontextmanager
@@ -29,6 +45,7 @@ async def lifespan(_app):
     auth.init()
     extras.init()
     recovery.init()
+    race_calendar.init()
     task = None
     if config.SYNC_INTERVAL_MIN > 0 and not config.DEMO:
         task = asyncio.create_task(_background_sync())
@@ -43,7 +60,7 @@ app = FastAPI(title="Ironman Dashboard", lifespan=lifespan, docs_url=None, redoc
 PUBLIC = {"/login", "/api/login", "/setup", "/api/setup", "/api/invite", "/api/widget", "/styles.css", "/manifest.webmanifest", "/sw.js"}
 PUBLIC_PREFIX = ("/icons/",)
 # Тренер видит всё, но не меняет данные и не трогает подключения спортсмена
-COACH_DENY = (("POST", "/api/swim-fix"), ("PUT", "/api/goals"), ("PUT", "/api/thresholds"), ("PUT", "/api/race"), ("POST", "/api/weight"),
+COACH_DENY = (("POST", "/api/race-calendar"), ("POST", "/api/swim-fix"), ("PUT", "/api/goals"), ("PUT", "/api/thresholds"), ("PUT", "/api/race"), ("POST", "/api/weight"),
               ("POST", "/api/exclude"), ("POST", "/api/manual"), ("DELETE", "/api/manual"), ("GET", "/api/fitbit"))
 
 
@@ -344,6 +361,22 @@ def swim_fix(source: str, source_id: str, body: dict):
     num = lambda k: float(body[k]) if body.get(k) not in (None, "") else None
     swim.set_fix(source, source_id, num("pool_m"), num("distance_m"), num("spl"))
     return {"ok": True}
+
+
+@app.get("/api/race-calendar")
+def race_cal():
+    return {**race_calendar.list_events(), "refreshing": _races_running}
+
+
+@app.post("/api/race-calendar/mark/{eid}")
+def race_mark(eid: str):
+    return {"marked": race_calendar.toggle_mark(eid)}
+
+
+@app.post("/api/race-calendar/refresh")
+async def race_refresh():
+    asyncio.create_task(_refresh_races())
+    return {"started": True}
 
 
 @app.get("/api/status")

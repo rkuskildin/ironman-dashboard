@@ -9,6 +9,11 @@ const ICONS = {
   football: '<circle cx="12" cy="12" r="9"/><path d="m12 7.5 3.2 2.3-1.2 3.8h-4l-1.2-3.8z"/><path d="M12 3v4.5M15.2 9.8l4.5-1.6M14 13.6l2.7 3.9M10 13.6l-2.7 3.9M8.8 9.8 4.3 8.2"/>',
   other: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/>',
   transition: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
+  trail: '<path d="m3 20 6-10 4 6 2.5-3.5L21 20z"/><circle cx="16" cy="5" r="1.6"/>',
+  tri: '<circle cx="6" cy="15" r="3"/><circle cx="18" cy="15" r="3"/><circle cx="12" cy="7" r="3"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  star: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9z"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   rest: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2.5v3M8 2.5v3M3 9.5h18"/>',
@@ -1230,6 +1235,180 @@ async function renderReport() {
   requestAnimationFrame(drawArrows);
 }
 
+// ---------- Старты: календарь соревнований ----------
+const RSPORT = { run: ["Бег", "var(--run)", "run"], trail: ["Трейл", "var(--strength)", "trail"], bike: ["Вело", "var(--bike)", "bike"],
+  swim: ["Открытая вода", "var(--swim)", "swim"], tri: ["Триатлон", "var(--hockey)", "tri"] };
+const RREGION = [["ru", "Россия"], ["moscow", "Москва и МО"], ["abroad", "За рубежом"], ["online", "Онлайн"], ["all", "Все"]];
+const RPERIOD = [[1, "месяц"], [3, "3 мес"], [6, "полгода"], [12, "год"], [0, "всё"]];
+const RDIST = [["any", "любая"], ["short", "до 10 км"], ["half", "10–21 км"], ["mar", "марафон 42"], ["ultra", "ультра 50+"]];
+const DOWS = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+let RC = null;
+const rcState = (() => { const def = { view: "list", sports: Object.keys(RSPORT), region: "ru", period: 6, dist: "any", q: "", mine: false, month: null };
+  try { return { ...def, ...JSON.parse(localStorage.getItem("rc_state") || "{}") }; } catch { return def; } })();
+const rcSave = () => { try { localStorage.setItem("rc_state", JSON.stringify(rcState)); } catch {} };
+
+function rcFilter(evs) {
+  const today = iso(new Date());
+  const lim = rcState.period ? iso(addDays(new Date(), rcState.period * 30.5)) : "9999";
+  const q = rcState.q.trim().toLowerCase();
+  return evs.filter((e) => {
+    if (!rcState.sports.includes(e.sport)) return false;
+    if (rcState.region === "ru" && !(e.region === "russia" || e.region === "moscow")) return false;
+    if (!["ru", "all"].includes(rcState.region) && e.region !== rcState.region) return false;
+    if (rcState.region !== "online" && rcState.region !== "all" && e.online) return false;
+    if ((e.end || e.start) < today || e.start > lim) return false;
+    if (rcState.mine && !e.marked) return false;
+    const km = e.km || [], mx = Math.max(0, ...km);
+    if (rcState.dist === "short" && !km.some((k) => k <= 10)) return false;
+    if (rcState.dist === "half" && !km.some((k) => k > 10 && k <= 21.2)) return false;
+    if (rcState.dist === "mar" && !km.some((k) => k >= 42 && k <= 43)) return false;
+    if (rcState.dist === "ultra" && mx < 50) return false;
+    if (q && !`${e.name} ${e.city}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+const fmtKm = (k, sport) => (k < 1 ? `${Math.round(k * 1000)} м` : k === 21.1 || k === 21.097 ? "21,1" : k === 42.2 || k === 42.195 ? "42,2" : String(+k.toFixed(1)).replace(".", ","));
+function rcLinks(e, small) {
+  const L = [];
+  if (e.reg) L.push(`<a class="rc-link primary" href="${esc(e.reg)}" target="_blank" rel="noopener">Регистрация</a>`);
+  if (e.site) L.push(`<a class="rc-link" href="${esc(e.site)}" target="_blank" rel="noopener">Сайт</a>`);
+  for (const [s, u] of Object.entries(e.links || {})) if (u && u !== e.reg) L.push(`<a class="rc-link src" href="${esc(u)}" target="_blank" rel="noopener">${esc(RC.source_names[s] || s)}</a>`);
+  return `<div class="rc-links">${L.join("")}</div>`;
+}
+function rcCard(e) {
+  const d = parseD(e.start), [nm, col, ic] = RSPORT[e.sport] || RSPORT.run;
+  const range = e.end && e.end !== e.start ? `–${parseD(e.end).getDate()}${parseD(e.end).getMonth() !== d.getMonth() ? " " + MONTHS[parseD(e.end).getMonth()] : ""}` : "";
+  return `<div class="rc-card" style="--c:${col}">
+    <div class="rc-date"><b>${d.getDate()}${range}</b><span>${MONTHS[d.getMonth()]} · ${DOWS[d.getDay()]}</span></div>
+    <div class="rc-main"><div class="rc-title"><span class="rc-ico">${icon(ic)}</span>${esc(e.name)}</div>
+      <div class="rc-meta">${esc(e.city || "место уточняется")}${e.online ? " · онлайн" : ""} · ${nm}</div>
+      ${e.km?.length ? `<div class="rc-km">${e.km.slice(0, 8).map((k) => `<span>${fmtKm(k, e.sport)}${k >= 1 ? " км" : ""}</span>`).join("")}</div>` : ""}
+      ${rcLinks(e)}</div>
+    <button class="rc-star ${e.marked ? "on" : ""} athlete-only" title="${e.marked ? "Убрать из моих" : "Хочу участвовать"}" onclick="rcMark('${e.id}', this)">${icon("star")}</button>
+  </div>`;
+}
+async function rcMark(id, btn) {
+  const r = await api(`race-calendar/mark/${id}`, { method: "POST" });
+  const e = RC.events.find((x) => x.id === id); if (e) e.marked = r.marked;
+  btn.classList.toggle("on", r.marked); toast(r.marked ? "Добавлено в мои старты" : "Убрано из моих стартов");
+}
+
+async function renderRaces() {
+  RC = await api("race-calendar");
+  const el = $("#view-races");
+  const draw = () => {
+    const list = rcFilter(RC.events);
+    const cnt = (sp) => rcFilter(RC.events.map((e) => e)).filter((e) => e.sport === sp).length;
+    const srcOk = RC.sources.filter((s) => s.ok).length;
+    el.innerHTML = `
+      <div class="page-head"><div><h1>Старты</h1>
+        <div class="sub">${RC.events.length} событий из ${srcOk} источников${RC.updated ? ` · обновлено ${esc(RC.updated)}` : ""}${RC.refreshing ? " · идёт обновление…" : ""}</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="seg">${[["list", "Список"], ["cal", "Календарь"], ["map", "Карта"]].map(([k, l]) => `<button data-v="${k}" class="${rcState.view === k ? "on" : ""}">${l}</button>`).join("")}</div>
+          <button class="btn athlete-only" id="rc-refresh" ${RC.refreshing ? "disabled" : ""}>${icon("refresh")}Обновить</button></div></div>
+      <div class="card rc-filters">
+        <div class="rc-sports">${Object.entries(RSPORT).map(([k, [nm, col, ic]]) => `<button class="rc-chip ${rcState.sports.includes(k) ? "on" : ""}" data-s="${k}" style="--c:${col}">${icon(ic)}${nm}</button>`).join("")}</div>
+        <div class="rc-row">
+          <select id="rc-region">${RREGION.map(([k, l]) => `<option value="${k}" ${rcState.region === k ? "selected" : ""}>${l}</option>`).join("")}</select>
+          <select id="rc-period">${RPERIOD.map(([k, l]) => `<option value="${k}" ${rcState.period == k ? "selected" : ""}>${l}</option>`).join("")}</select>
+          <select id="rc-dist">${RDIST.map(([k, l]) => `<option value="${k}" ${rcState.dist === k ? "selected" : ""}>Дистанция: ${l}</option>`).join("")}</select>
+          <input id="rc-q" placeholder="Поиск: название или город" value="${esc(rcState.q)}">
+          <label class="rc-mine athlete-only"><input type="checkbox" id="rc-mine" ${rcState.mine ? "checked" : ""}> ${icon("star")}мои</label>
+          <span class="muted num">${list.length} найдено</span>
+        </div>
+      </div>
+      <div id="rc-body"></div>
+      <div class="muted rc-src">Источники: ${RC.sources.map((s) => `<span class="${s.ok ? "" : "t-bad"}" title="${esc(s.message)} · ${esc(s.updated)}">${esc(RC.source_names[s.source] || s.source)} ${s.ok ? s.count : "✗"}</span>`).join(" · ")}.
+        Дубли с разных сайтов объединены; даты и регистрацию проверяйте на сайте старта.</div>`;
+    el.querySelectorAll(".seg button[data-v]").forEach((b) => (b.onclick = () => { rcState.view = b.dataset.v; rcSave(); draw(); }));
+    el.querySelectorAll(".rc-chip").forEach((b) => (b.onclick = () => { const s = b.dataset.s;
+      rcState.sports = rcState.sports.includes(s) ? rcState.sports.filter((x) => x !== s) : [...rcState.sports, s]; rcSave(); draw(); }));
+    $("#rc-region").onchange = (e) => { rcState.region = e.target.value; rcSave(); draw(); };
+    $("#rc-period").onchange = (e) => { rcState.period = +e.target.value; rcSave(); draw(); };
+    $("#rc-dist").onchange = (e) => { rcState.dist = e.target.value; rcSave(); draw(); };
+    const mine = $("#rc-mine"); if (mine) mine.onchange = (e) => { rcState.mine = e.target.checked; rcSave(); draw(); };
+    let qt; $("#rc-q").oninput = (e) => { clearTimeout(qt); qt = setTimeout(() => { rcState.q = e.target.value; rcSave(); const p = e.target.selectionStart; draw(); const q = $("#rc-q"); q.focus(); q.setSelectionRange(p, p); }, 250); };
+    const rb = $("#rc-refresh"); if (rb) rb.onclick = async () => { await api("race-calendar/refresh", { method: "POST" });
+      toast("Обновление запущено — занимает 10–15 минут, можно закрыть страницу"); rb.disabled = true; };
+    const body = $("#rc-body");
+    if (rcState.view === "list") rcList(body, list);
+    else if (rcState.view === "cal") rcCalendar(body, list, draw);
+    else rcMap(body, list);
+  };
+  draw();
+}
+
+function rcList(body, list) {
+  if (!list.length) { body.innerHTML = `<div class="card empty">Ничего не нашлось — ослабьте фильтры</div>`; return; }
+  const byM = {};
+  list.forEach((e) => (byM[e.start.slice(0, 7)] ||= []).push(e));
+  body.innerHTML = Object.entries(byM).map(([m, evs]) => `<div class="rc-month"><h2>${MONTHS_FULL[+m.slice(5) - 1]} ${m.slice(0, 4)} <span class="muted">· ${evs.length}</span></h2>
+    <div class="card rc-list">${evs.slice(0, 300).map(rcCard).join("")}</div></div>`).join("");
+}
+
+function rcCalendar(body, list, redraw) {
+  const now = new Date();
+  const m0 = rcState.month ? parseD(rcState.month + "-01") : new Date(now.getFullYear(), now.getMonth(), 1);
+  const y = m0.getFullYear(), mo = m0.getMonth();
+  const first = new Date(y, mo, 1), startOff = (first.getDay() + 6) % 7, days = new Date(y, mo + 1, 0).getDate();
+  const byD = {};
+  list.forEach((e) => { const a = parseD(e.start), b = parseD(e.end || e.start);
+    for (let d = new Date(a); d <= b && d - a < 7 * 864e5; d = addDays(d, 1)) (byD[iso(d)] ||= []).push(e); });
+  const cells = [];
+  for (let i = 0; i < startOff; i++) cells.push(`<div class="rc-day empty"></div>`);
+  for (let d = 1; d <= days; d++) {
+    const k = iso(new Date(y, mo, d)), evs = byD[k] || [];
+    cells.push(`<div class="rc-day ${k === iso(now) ? "today" : ""} ${evs.length ? "has" : ""}" data-d="${k}"><div class="rc-dn">${d}</div>
+      ${evs.slice(0, 3).map((e) => `<div class="rc-ev" style="--c:${RSPORT[e.sport]?.[1]}">${esc(e.name)}</div>`).join("")}
+      ${evs.length > 3 ? `<div class="rc-more">+${evs.length - 3}</div>` : ""}</div>`);
+  }
+  const prev = iso(new Date(y, mo - 1, 1)).slice(0, 7), next = iso(new Date(y, mo + 1, 1)).slice(0, 7);
+  body.innerHTML = `<div class="card"><div class="cal-nav" style="margin-bottom:12px">
+      <button class="btn" data-m="${prev}">←</button><span class="range">${MONTHS_FULL[mo]} ${y}</span><button class="btn" data-m="${next}">→</button>
+      <span class="muted" style="margin-left:auto">${Object.keys(byD).filter((k) => k.startsWith(`${y}-${String(mo + 1).padStart(2, "0")}`)).length} дней со стартами</span></div>
+    <div class="rc-grid">${["пн", "вт", "ср", "чт", "пт", "сб", "вс"].map((d) => `<div class="rc-wd">${d}</div>`).join("")}${cells.join("")}</div></div>
+    <div id="rc-daylist"></div>`;
+  body.querySelectorAll("[data-m]").forEach((b) => (b.onclick = () => { rcState.month = b.dataset.m; rcSave(); redraw(); }));
+  body.querySelectorAll(".rc-day.has").forEach((c) => (c.onclick = () => {
+    body.querySelectorAll(".rc-day.sel").forEach((x) => x.classList.remove("sel")); c.classList.add("sel");
+    const evs = byD[c.dataset.d] || [];
+    $("#rc-daylist").innerHTML = `<h2>${fmtDay(c.dataset.d)} · ${evs.length}</h2><div class="card rc-list">${evs.map(rcCard).join("")}</div>`;
+    $("#rc-daylist").scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+}
+
+let _cluster;
+function loadCluster() {
+  if (window.L?.markerClusterGroup) return Promise.resolve();
+  return (_cluster ||= loadLeaflet().then(() => new Promise((ok, fail) => {
+    for (const f of ["MarkerCluster.min.css", "MarkerCluster.Default.min.css"]) { const l = document.createElement("link"); l.rel = "stylesheet";
+      l.href = `https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/${f}`; document.head.append(l); }
+    const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js";
+    sc.onload = ok; sc.onerror = fail; document.head.append(sc);
+  })));
+}
+async function rcMap(body, list) {
+  const pts = list.filter((e) => e.lat && e.lon);
+  body.innerHTML = `<div class="card"><div class="map rc-map" id="rc-map"></div>
+    <div class="legend" style="margin-top:10px">${Object.values(RSPORT).map(([nm, col]) => `<span><i class="sw" style="background:${col};border-radius:50%"></i>${nm}</span>`).join("")}
+      <span class="muted">· на карте ${pts.length} из ${list.length}${pts.length < list.length ? " (у остальных не удалось определить место)" : ""}</span></div></div>`;
+  await loadCluster();
+  const m = baseMap($("#rc-map"));
+  m.scrollWheelZoom.enable();
+  const cl = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 });
+  pts.forEach((e) => {
+    const col = css(RSPORT[e.sport]?.[1].slice(4, -1) || "--run");
+    const mk = L.circleMarker([e.lat, e.lon], { radius: 7, color: "#fff", weight: 2, fillColor: col, fillOpacity: 0.95 });
+    mk.bindPopup(`<div class="rc-pop"><b>${esc(e.name)}</b><div>${fmtShort(e.start)} ${e.start.slice(0, 4)} · ${esc(e.city || "")}</div>
+      ${e.km?.length ? `<div>${e.km.slice(0, 6).map((k) => fmtKm(k) + (k >= 1 ? " км" : "")).join(" · ")}</div>` : ""}${rcLinks(e)}</div>`, { maxWidth: 280 });
+    cl.addLayer(mk);
+  });
+  m.addLayer(cl);
+  const ru = pts.filter((e) => e.region !== "abroad");
+  if (ru.length) m.fitBounds(L.latLngBounds((ru.length > 3 ? ru : pts).map((e) => [e.lat, e.lon])), { padding: [24, 24], maxZoom: 9 });
+  else m.setView([55.75, 37.6], 5);
+}
+
 // ---------- Нагрузка ----------
 let loadDays = 180;
 async function renderLoad() {
@@ -1560,7 +1739,7 @@ async function renderThresholds() {
 }
 
 // ---------- роутинг ----------
-const VIEWS = { today: renderToday, calendar: renderCalendar, goal: renderGoal, load: renderLoad, health: renderHealth, settings: renderSettings, report: renderReport };
+const VIEWS = { today: renderToday, calendar: renderCalendar, goal: renderGoal, races: renderRaces, load: renderLoad, health: renderHealth, settings: renderSettings, report: renderReport };
 async function route() {
   const v = (location.hash.slice(1) || "today").split(/[?/]/)[0];
   const name = VIEWS[v] ? v : "today";
