@@ -74,6 +74,8 @@ def clean_name(n: str) -> str:
 
 
 ONLINE = re.compile(r"(?i)онлайн|online|zwift|виртуальн|virtual")
+# регулярные групповые тренировки и еженедельные «пятёрки» — не соревнования
+REGULAR = re.compile(r"(?i)тренировк|5\s*в[её]рст|parkrun|паркран|\bs95\b|еженедельн|беговой клуб")
 
 
 def ev(source, name, start, end=None, city=None, sport="run", km=None, url=None, reg=None, site=None,
@@ -499,6 +501,7 @@ def refresh(sources: list[str] | None = None, geocode_limit: int = 400) -> dict:
                 if s not in sources:
                     collected.append({**k, "source": s, "url": k["links"].get(s)})
     today = dt.date.today().isoformat()
+    collected = [e for e in collected if not REGULAR.search(e.get("name") or "")]
     merged = [e for e in merge(collected) if (e.get("end") or e["start"]) >= today]
     n_geo = 0
     for e in merged:
@@ -524,6 +527,7 @@ def list_events() -> dict:
     init()
     with db.session() as c:
         rows = [json.loads(r["data"]) for r in c.execute("SELECT data FROM race_cal ORDER BY start")]
+        rows = [e for e in rows if not REGULAR.search(e.get("name") or "")]
         marks = {r["id"] for r in c.execute("SELECT id FROM race_marks")}
         src = [dict(r) for r in c.execute("SELECT * FROM race_cal_src ORDER BY source")]
         upd = c.execute("SELECT value FROM settings WHERE key='race_cal_updated'").fetchone()
