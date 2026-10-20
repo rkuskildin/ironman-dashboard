@@ -133,8 +133,12 @@ def activities(start: str, end: str) -> list[dict]:
         if r.get("fitbit_avg_hr"):  # пульс на тренировках — с Fitbit, Garmin оставляем для сравнения
             r["garmin_avg_hr"], r["garmin_max_hr"] = r["avg_hr"], r["max_hr"]
             r["avg_hr"], r["max_hr"], r["hr_source"] = r["fitbit_avg_hr"], r["fitbit_max_hr"], "fitbit"
+        hrs_ = (r.get("moving_s") or r.get("duration_s") or 0) / 3600
+        if r["sport"] == "swim" and r["tss"] and hrs_ > 0.2 and r["tss"] / hrs_ < 15 and r.get("distance_m"):
+            r["tss"] = None  # Garmin/TP не знают порогового темпа в воде и дают почти ноль — считаем сами по темпу
         if not r["tss"] and not r.get("load_note"):
-            r["tss"] = estimate_tss(r["sport"], r["duration_s"], r["avg_hr"], r["np"], r["distance_m"])
+            mv_ = r.get("moving_s") or r["duration_s"]
+            r["tss"] = estimate_tss(r["sport"], mv_, None if r["sport"] == "swim" else r["avg_hr"], r["np"], r["distance_m"])
             r["tss_estimated"] = True
     return primary
 
