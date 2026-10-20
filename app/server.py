@@ -172,6 +172,11 @@ def fitness(days: int = 180, forward: int = 21):
     return service.fitness(min(days, 1500), min(forward, 120))
 
 
+@app.get("/api/load-breakdown")
+def load_breakdown(days: int = 14):
+    return service.load_breakdown(min(max(days, 7), 42))
+
+
 @app.get("/api/volume")
 def volume(weeks: int = 16):
     return service.volume(min(weeks, 120))

@@ -1,5 +1,6 @@
 """Сведение данных из всех источников в единую картину для панели."""
 import json
+import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from statistics import mean
@@ -28,6 +29,9 @@ def planned(start: str, end: str) -> list[dict]:
                                     distance_m=r["distance_m"])
             r["tss_estimated"] = True
     return rows
+
+
+AUTO_NOISE = {"WALKING", "AEROBIC_WORKOUT", "OUTDOOR_WORKOUT", "WORKOUT", "SPORT", "GENERIC", "OTHER"}
 
 
 def _same_session(a: dict, b: dict) -> bool:
@@ -119,6 +123,10 @@ def activities(start: str, end: str) -> list[dict]:
                 r["garmin_distance_m"] = r["distance_m"]
                 r["distance_m"] = r["swim"]["fixed_distance"]
     for r in primary:
+        an = r.get("analysis") or {}
+        if r["source"] == "fitbit" and (an.get("exercise_type") in AUTO_NOISE or (r["sport"] == "other" and re.search(r"(?i)ходьба|walk|аэробик|активност|activity", r.get("title") or ""))):
+            # Fitbit сам распознал бытовую активность (ходьба, «аэробика» по дороге в бассейн) — не тренировка
+            r["tss"], r["load_note"] = 0.0, "авто-активность Fitbit — не входит в тренировочную нагрузку"
         if r["source"] == "manual" and r.get("analysis"):  # пересчёт по текущим порогам
             r["tss"], r["analysis"]["hr_zones"] = manual.recompute(r["analysis"])
         r.pop("_merged", None)
@@ -154,7 +162,8 @@ def fitness(days: int = 180, forward: int = 21) -> list[dict]:
     warm = start - timedelta(days=365)
     daily = defaultdict(float)
     for a in activities(warm.isoformat(), today.isoformat()):
-        daily[a["date"]] += a["tss"] or 0
+        if not a.get("excluded"):
+            daily[a["date"]] += a["tss"] or 0
     for p in planned((today + timedelta(days=1)).isoformat(), end.isoformat()):
         daily[p["date"]] += p["tss"] or 0
     series = [s for s in fitness_series(daily, warm, end) if s["date"] >= start.isoformat()]
@@ -337,3 +346,34 @@ def overview() -> dict:
         "alerts": alerts,
         "last_sync": last_sync,
     }
+
+
+def load_breakdown(days: int = 14) -> dict:
+    """Из чего сложились усталость (ATL) и свежесть (TSB): нагрузка по дням и видам спорта."""
+    today = date.today()
+    start = today - timedelta(days=days - 1)
+    fit = {x["date"]: x for x in fitness(days=days + 1, forward=0)}
+    by_day = defaultdict(list)
+    for a in activities(start.isoformat(), today.isoformat()):
+        by_day[a["date"]].append({"sport": a["sport"], "title": a.get("title"), "tss": round(a.get("tss") or 0, 1),
+                                  "minutes": round((a.get("duration_s") or 0) / 60), "source": a["source"],
+                                  "estimated": bool(a.get("tss_estimated")), "excluded": bool(a.get("excluded")),
+                                  "note": a.get("load_note"), "source_id": a["source_id"]})
+    out = []
+    for i in range(days):
+        d = (start + timedelta(days=i)).isoformat()
+        f = fit.get(d) or {}
+        out.append({"date": d, "tss": f.get("tss"), "ctl": f.get("ctl"), "atl": f.get("atl"), "tsb": f.get("tsb"),
+                    "items": by_day.get(d, [])})
+    def sums(n):
+        acc = defaultdict(float)
+        lim = (today - timedelta(days=n - 1)).isoformat()
+        for d in out:
+            if d["date"] >= lim:
+                for it in d["items"]:
+                    if not it["excluded"]:
+                        acc[it["sport"]] += it["tss"]
+        return {k: round(v) for k, v in sorted(acc.items(), key=lambda x: -x[1])}
+    cur = fit.get(today.isoformat()) or {}
+    return {"days": out, "by_sport_7": sums(7), "by_sport_14": sums(14),
+            "now": {"ctl": cur.get("ctl"), "atl": cur.get("atl"), "tsb": cur.get("tsb")}}

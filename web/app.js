@@ -571,7 +571,7 @@ async function renderToday() {
       <div class="card kpi"><div class="stat"><div class="label">Фитнес · CTL</div><div class="value num">${f ? Math.round(f.ctl) : "—"}</div>
         <div class="delta ${f && fw && f.ctl >= fw.ctl ? "up" : ""}">${f && fw ? `${f.ctl - fw.ctl >= 0 ? "+" : ""}${(f.ctl - fw.ctl).toFixed(1)} за неделю` : ""}</div></div>
         ${sparkline(fit.map((d) => d.ctl), css("--s1"))}</div>
-      <div class="card kpi"><div class="stat"><div class="label">Свежесть · TSB</div><div class="value num ${tsbCls}">${f ? Math.round(f.tsb) : "—"}</div>
+      <div class="card kpi" style="cursor:pointer" onclick="location.hash='#load';setTimeout(()=>$('#tsb-why')?.scrollIntoView({behavior:'smooth'}),400)" title="Что повлияло на свежесть"><div class="stat"><div class="label">Свежесть · TSB ›</div><div class="value num ${tsbCls}">${f ? Math.round(f.tsb) : "—"}</div>
         <div class="delta">${tsbHint} · ATL ${f ? Math.round(f.atl) : "—"}</div></div>
         ${sparkline(fit.map((d) => d.tsb), css("--s2"))}</div>
       <div class="card kpi"><div class="stat"><div class="label">Неделя · выполнено</div><div class="value num">${ws.done}<small>из ${ws.planned}</small></div>
@@ -1420,11 +1420,24 @@ async function rcMap(body, list) {
 // ---------- Нагрузка ----------
 let loadDays = 180;
 async function renderLoad() {
-  const [fit, vol] = await Promise.all([api(`fitness?days=${loadDays}&forward=21`), api("volume?weeks=16")]);
+  const [fit, vol, lb] = await Promise.all([api(`fitness?days=${loadDays}&forward=21`), api("volume?weeks=16"), api("load-breakdown?days=14")]);
   const el = $("#view-load");
   el.innerHTML = `
     <div class="page-head"><div><h1>Нагрузка</h1><div class="sub">форма, усталость и объёмы по неделям</div></div>
       <div class="seg">${[[42, "6 нед"], [90, "3 мес"], [180, "6 мес"], [365, "год"]].map(([d, l]) => `<button data-d="${d}" class="${d === loadDays ? "on" : ""}">${l}</button>`).join("")}</div></div>
+    <div class="card section" id="tsb-why"><div class="card-h"><h3>${icon("gauge")}Что повлияло на свежесть</h3>
+      <span class="meta">сейчас: фитнес ${Math.round(lb.now.ctl ?? 0)} − усталость ${Math.round(lb.now.atl ?? 0)} ≈ свежесть ${Math.round(lb.now.tsb ?? 0)}</span></div>
+      <div class="muted" style="font-size:12.5px;margin-bottom:12px">Усталость (ATL) — средняя нагрузка примерно за последнюю неделю, фитнес (CTL) — за 6 недель.
+        Свежесть падает, когда последняя неделя тяжелее, чем вы привыкли. Ниже — откуда взялась нагрузка за 2 недели.</div>
+      <div class="tsb-sports">${Object.entries(lb.by_sport_7).map(([k, v]) => `<span class="tsb-sp" style="--c:${sportColor(k)}">${icon(k)}${SPORT[k]?.name || k}<b class="num">${v}</b></span>`).join("") || `<span class="muted">за 7 дней нагрузки нет</span>`}
+        <span class="muted" style="font-size:12px">TSS за 7 дней по видам</span></div>
+      <div class="chart-box sm" style="margin-top:12px"><canvas id="c-why"></canvas></div>
+      <div class="tsb-days">${lb.days.slice().reverse().filter((d) => d.items.length).map((d) => `<div class="tsb-day"><div class="tsb-dh"><b>${fmtDay(d.date)}</b>
+          <span class="muted num">TSS ${Math.round(d.tss || 0)} · свежесть ${Math.round(d.tsb ?? 0)}</span></div>
+        ${d.items.map((it) => `<div class="tsb-it ${it.excluded || it.note ? "off" : ""}" style="--c:${sportColor(it.sport)}">${icon(it.sport)}<span>${esc(it.title || SPORT[it.sport]?.name || "")}
+          <em class="muted">${it.minutes} мин · ${it.source}${it.estimated && !it.note ? " · TSS по пульсу" : ""}${it.note ? " · " + esc(it.note) : ""}${it.excluded ? " · не учитывается" : ""}</em></span>
+          <b class="num">${it.note || it.excluded ? "—" : Math.round(it.tss)}</b></div>`).join("")}</div>`).join("")}</div>
+    </div>
     <div class="card chart-card"><h3>Фитнес (CTL) и усталость (ATL)</h3>
       <div class="sub">Пунктир — прогноз по плану тренера на 3 недели вперёд</div>
       <div class="chart-box"><canvas id="c-fit"></canvas></div></div>
@@ -1440,6 +1453,12 @@ async function renderLoad() {
       <div class="chart-box sm"><canvas id="c-comp"></canvas></div></div>`;
   el.querySelectorAll(".seg button").forEach((b) => (b.onclick = () => { loadDays = +b.dataset.d; renderLoad(); }));
 
+  const whySports = [...new Set(lb.days.flatMap((d) => d.items.filter((i) => !i.note && !i.excluded).map((i) => i.sport)))];
+  mkChart("c-why", { data: { labels: lb.days.map((d) => fmtShort(d.date)), datasets: [
+    ...whySports.map((sp) => ({ type: "bar", label: SPORT[sp]?.name || sp, stack: "t", borderRadius: 3, maxBarThickness: 28,
+      backgroundColor: css(sportColor(sp).slice(4, -1)), data: lb.days.map((d) => Math.round(d.items.filter((i) => i.sport === sp && !i.note && !i.excluded).reduce((a, i) => a + i.tss, 0)) || null) })),
+    { type: "line", label: "Свежесть (TSB)", data: lb.days.map((d) => d.tsb), borderColor: css("--ink-2"), backgroundColor: css("--ink-2"), borderWidth: 2, pointRadius: 2, yAxisID: "y" },
+  ] }, options: { ...timeOpts(), scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: css("--grid") }, border: { display: false } } } } });
   const labels = fit.map((d) => fmtShort(d.date));
   const todayIdx = fit.findIndex((d) => d.future) - 1;
   const seg = { borderDash: (c) => (c.p0DataIndex >= todayIdx && todayIdx >= 0 ? [5, 4] : undefined) };
