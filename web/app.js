@@ -116,7 +116,7 @@ function swimBlock(a) {
       <span class="pill">бассейн ${pool} м</span></div>
     <div class="grid g4 an-cells" style="margin-top:0">
       <div class="stat"><div class="label">Гребков всего</div><div class="value num" style="font-size:20px">${n0(s.strokes)}</div>
-        <div class="delta">${s.spl ? `≈${s.spl} на ${pool} м (ваши)` : `у Garmin ≈${s.avg_strokes ?? "—"} на отрезок`}</div></div>
+        <div class="delta">≈${s.spl_real ?? "—"} на ${pool} м${s.est_lengths ? "" : ` (у Garmin ${s.avg_strokes ?? "—"} на отрезок)`}</div></div>
       <div class="stat"><div class="label">SWOLF на ${pool} м</div><div class="value num" style="font-size:20px">${s.swolf_real ?? "—"}</div>
         <div class="delta">${s.swolf_real ? "время отрезка + гребки" : `у Garmin ${s.swolf ?? "—"} — по его отрезкам`}</div></div>
       <div class="stat"><div class="label">Отрезков по ${pool} м</div><div class="value num" style="font-size:20px">${s.est_lengths ?? s.garmin_lengths}</div>
@@ -131,22 +131,28 @@ function swimBlock(a) {
         title="${l.i}: ${l.t} с${l.strokes ? `, ${l.strokes} гребков, ${l.style_ru}` : ""}${l.flag ? " — " + l.flag : ""}">${l.flag && l.strokes ? "<i>⚠</i>" : ""}</span>`).join("")}</div>
     <div class="legend" style="margin-top:6px">${Object.entries(STYLE_COL).filter(([k]) => s.styles[k]).map(([k, c]) => `<span><i class="sw" style="background:${c}"></i>${k}</span>`).join("")}
       <span><i class="sw" style="background:var(--surface-3)"></i>пауза</span></div>
-    <form class="swim-fix athlete-only" onsubmit="event.preventDefault();fixSwim(this,'${esc(a.source)}','${esc(a.source_id)}')">
-      <label>Бассейн <select name="pool">${[25, 50].map((v) => `<option value="${v}" ${v == pool ? "selected" : ""}>${v} м</option>`).join("")}</select></label>
-      <label>моих гребков на отрезок <input name="spl" type="number" step="0.5" value="${s.spl || ""}" placeholder="напр. 36" style="width:80px"></label>
-      <label>или дистанция <input name="dist" type="number" step="25" placeholder="м" value="${s.fix?.distance_m || ""}" style="width:80px"></label>
+    <form class="swim-fix athlete-only" onsubmit="event.preventDefault();fixSwim(this,'${esc(a.source)}','${esc(a.source_id)}','recalc')">
+      <span>Мои гребки на ${pool} м:</span>
+      <label>кроль <input name="FREESTYLE" type="number" step="0.5" value="${s.spl_map.FREESTYLE ?? ""}" style="width:64px"></label>
+      <label>брасс <input name="BREASTSTROKE" type="number" step="0.5" value="${s.spl_map.BREASTSTROKE ?? ""}" style="width:64px"></label>
       <button class="btn primary" type="submit">Пересчитать</button>
-      ${s.fix ? `<button class="btn" type="button" onclick="fixSwim(null,'${esc(a.source)}','${esc(a.source_id)}')">Как в Garmin</button>` : ""}
+      <label>или дистанция <input name="dist" type="number" step="25" placeholder="м" value="${s.fix?.distance_m || ""}" style="width:76px"></label>
+      <button class="btn" type="button" onclick="fixSwim(this.form,'${esc(a.source)}','${esc(a.source_id)}','dist')">Задать</button>
+      ${s.fix_how !== "как в Garmin" ? `<button class="btn" type="button" onclick="fixSwim(null,'${esc(a.source)}','${esc(a.source_id)}','garmin')">Как в Garmin</button>` : ""}
     </form>
-    ${s.fixed_distance ? `<div class="muted" style="font-size:12px;margin-top:6px">Темп, рекорды и прогноз считаются по ${n0(s.fixed_distance)} м вместо ${n0(s.garmin_distance)} м.
-      Число гребков на отрезок запомнено — на следующих тренировках в этом бассейне пересчёт подскажется сам.</div>` : ""}
+    ${s.fixed_distance ? `<div class="muted" style="font-size:12px;margin-top:6px">Дистанция исправлена ${s.fix_how}: ${n0(s.fixed_distance)} м вместо ${n0(s.garmin_distance)} м у Garmin —
+      темп, рекорды и прогноз считаются по ней. Гребки на отрезок по стилям применяются ко всем плаваниям в бассейне ${pool} м.</div>`
+      : s.fix_how === "как в Garmin" ? `<div class="muted" style="font-size:12px;margin-top:6px">Оставлено как в Garmin. <a href="#" onclick="event.preventDefault();fixSwim(null,'${esc(a.source)}','${esc(a.source_id)}','recalc')">Вернуть пересчёт по гребкам</a></div>` : ""}
   </div>`;
 }
-async function fixSwim(form, src, id) {
-  const body = form ? { pool_m: form.pool.value || null, distance_m: form.dist.value || null, spl: form.spl.value || null } : {};
-  if (form && !body.spl && !body.distance_m) return toast("Впишите гребки на отрезок или дистанцию");
+async function fixSwim(form, src, id, mode) {
+  const body = { pool_m: 50 };
+  if (form) { body.spl = { FREESTYLE: form.FREESTYLE.value, BREASTSTROKE: form.BREASTSTROKE.value };
+    body.pool_m = +(form.closest(".swim-block")?.querySelector(".pill")?.textContent.match(/\d+/)?.[0] || 50); }
+  if (mode === "garmin") body.keep_garmin = true;
+  if (mode === "dist") { if (!form.dist.value) return toast("Впишите дистанцию"); body.distance_m = +form.dist.value; }
   await api(`swim-fix/${encodeURIComponent(src)}/${encodeURIComponent(id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  toast(form ? "Дистанция исправлена" : "Вернул данные Garmin"); route();
+  toast(mode === "garmin" ? "Оставлено как в Garmin" : mode === "dist" ? "Дистанция задана" : "Пересчитано по гребкам"); route();
 }
 
 function analysisBlock(an, a) {

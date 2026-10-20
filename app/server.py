@@ -357,9 +357,17 @@ def widget(token: str = ""):
 
 @app.post("/api/swim-fix/{source}/{source_id}")
 def swim_fix(source: str, source_id: str, body: dict):
+    """Плавание: свои гребки на отрезок по стилям, ручная дистанция, «как в Garmin» или сброс."""
     from . import swim
-    num = lambda k: float(body[k]) if body.get(k) not in (None, "") else None
-    swim.set_fix(source, source_id, num("pool_m"), num("distance_m"), num("spl"))
+    for style, v in (body.get("spl") or {}).items():
+        if v not in (None, ""):
+            swim.set_spl(float(body.get("pool_m") or 50), style, float(v))
+    if body.get("keep_garmin"):
+        swim.set_fix(source, source_id, keep_garmin=True)
+    elif body.get("distance_m"):
+        swim.set_fix(source, source_id, distance_m=float(body["distance_m"]))
+    else:
+        swim.set_fix(source, source_id, clear=True)
     return {"ok": True}
 
 

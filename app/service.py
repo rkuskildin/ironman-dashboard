@@ -31,11 +31,13 @@ def planned(start: str, end: str) -> list[dict]:
 
 
 def _same_session(a: dict, b: dict) -> bool:
-    """Одна и та же тренировка из двух источников. Дистанция надёжнее времени:
-    Garmin считает общее время с паузами, TP — чистое (в бассейне разница бывает вдвое)."""
-    if a["distance_m"] and b["distance_m"]:
-        return abs(a["distance_m"] - b["distance_m"]) <= 0.05 * b["distance_m"] + 50
-    return abs((a["duration_s"] or 0) - (b["duration_s"] or 0)) <= 0.15 * (b["duration_s"] or 1)
+    """Одна и та же тренировка из двух источников. Garmin считает время с паузами, TP — чистое;
+    в бассейне дистанции у них могут разойтись (разный подсчёт отрезков), поэтому сверяем и время."""
+    if a["distance_m"] and b["distance_m"] and abs(a["distance_m"] - b["distance_m"]) <= 0.05 * b["distance_m"] + 50:
+        return True
+    ta = [x for x in (a.get("moving_s"), a.get("duration_s")) if x]
+    tb = b.get("duration_s") or 0
+    return bool(tb) and any(abs(x - tb) <= 0.15 * tb for x in ta)
 
 
 def _span(r):
@@ -107,11 +109,12 @@ def activities(start: str, end: str) -> list[dict]:
     from . import swim
     excl = excluded_set()
     sfix = swim.fixes()
+    spl_map = swim.spl_defaults()
     for r in primary:
         r["excluded"] = (r["source"], r["source_id"]) in excl
         sw = (r.get("analysis") or {}).get("swim")
         if sw:
-            r["swim"] = swim.analyze(sw, sfix.get(f'{r["source"]}:{r["source_id"]}'))
+            r["swim"] = swim.analyze(sw, sfix.get(f'{r["source"]}:{r["source_id"]}'), spl_map)
             if r["swim"]["fixed_distance"]:
                 r["garmin_distance_m"] = r["distance_m"]
                 r["distance_m"] = r["swim"]["fixed_distance"]
