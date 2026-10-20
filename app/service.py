@@ -133,7 +133,7 @@ def activities(start: str, end: str) -> list[dict]:
         if r.get("fitbit_avg_hr"):  # пульс на тренировках — с Fitbit, Garmin оставляем для сравнения
             r["garmin_avg_hr"], r["garmin_max_hr"] = r["avg_hr"], r["max_hr"]
             r["avg_hr"], r["max_hr"], r["hr_source"] = r["fitbit_avg_hr"], r["fitbit_max_hr"], "fitbit"
-        if not r["tss"]:
+        if not r["tss"] and not r.get("load_note"):
             r["tss"] = estimate_tss(r["sport"], r["duration_s"], r["avg_hr"], r["np"], r["distance_m"])
             r["tss_estimated"] = True
     return primary
