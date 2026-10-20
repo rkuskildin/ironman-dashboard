@@ -169,6 +169,7 @@ def recovery(day: str | None = None) -> dict:
         "hrv": cur.get("hrv"), "hrv_base": round(math.exp(mean(hrv_hist)), 1) if hrv_hist else None, "hrv_z": hz and round(hz, 2),
         "rhr": cur.get("resting_hr"), "rhr_base": round(mean(rhr_hist), 1) if rhr_hist else None, "rhr_z": rz and round(rz, 2),
         "sleep_h": round(sleep_h, 1) if sleep_h else None, "sleep_need": round(need, 1),
+        "sleep_gap_min": round((cur.get("sleep_gap_s") or 0) / 60) or None, "nap_min": round((cur.get("nap_s") or 0) / 60) or None,
         "sleep_perf": sleep_perf and round(sleep_perf * 100),
         "bed_time": night and night["bed_time"], "late_min": night and night["late_min"],
         "yesterday_strain": ys and ys["strain"],

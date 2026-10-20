@@ -138,6 +138,9 @@ def sync(days_back: int) -> str:
     def row(d):
         return rows.setdefault(d, {"date": d, "source": "fitbit"})
 
+    # Ночь = все куски сна, начавшиеся с 18:00 до 12:00 (Fitbit делит ночь на части при долгом пробуждении).
+    # Куски, начавшиеся днём (12:00–18:00), — дневной сон, в ночь не входят.
+    nights: dict[str, list] = {}
     for p in _list("sleep", f'sleep.interval.civil_end_time >= "{start}" AND sleep.interval.civil_end_time < "{end}"'):
         if (p.get("dataSource") or {}).get("platform") == "HEALTH_CONNECT":
             continue  # копии ночей из других приложений (Garmin через Health Connect) — Garmin берём напрямую
@@ -146,18 +149,30 @@ def sync(days_back: int) -> str:
         iv = s.get("interval") or {}
         d = _wake_date(iv)
         asleep = _num(summ.get("minutesAsleep"))
-        if not d or not asleep:
-            continue
-        r = row(d)
-        if asleep * 60 <= (r.get("sleep_s") or 0):  # берём основной (самый длинный) сон за ночь
+        bed = _msk(iv.get("startTime"))
+        if not d or not asleep or not bed:
             continue
         stages = {st.get("type", ""): _num(st.get("minutes")) or 0 for st in summ.get("stagesSummary", [])}
-        in_period = _num(summ.get("minutesInSleepPeriod"))
-        r.update(bed_time=_msk(iv.get("startTime")), wake_time=_msk(iv.get("endTime")),
-                 sleep_s=asleep * 60,
-                 deep_s=(stages.get("DEEP") or 0) * 60 or None,
-                 rem_s=(stages.get("REM") or 0) * 60 or None,
-                 sleep_score=round(asleep / in_period * 100) if in_period else None)  # эффективность сна
+        seg = {"bed": bed, "wake": _msk(iv.get("endTime")), "asleep": asleep,
+               "in_period": _num(summ.get("minutesInSleepPeriod")) or asleep,
+               "deep": stages.get("DEEP") or 0, "rem": stages.get("REM") or 0}
+        hour = int(bed[11:13])
+        if 12 <= hour < 18:
+            row(d)["nap_s"] = (row(d).get("nap_s") or 0) + asleep * 60
+            continue
+        nights.setdefault(d, []).append(seg)
+    for d, segs in nights.items():
+        segs.sort(key=lambda x: x["bed"])
+        asleep = sum(x["asleep"] for x in segs)
+        in_period = sum(x["in_period"] for x in segs)
+        gap = 0.0
+        for a, b in zip(segs, segs[1:]):  # перерывы между кусками — время без сна посреди ночи
+            ta = datetime.strptime(a["wake"], "%Y-%m-%d %H:%M"); tb = datetime.strptime(b["bed"], "%Y-%m-%d %H:%M")
+            gap += max(0.0, (tb - ta).total_seconds())
+        row(d).update(bed_time=segs[0]["bed"], wake_time=segs[-1]["wake"], sleep_s=asleep * 60,
+                      deep_s=sum(x["deep"] for x in segs) * 60 or None, rem_s=sum(x["rem"] for x in segs) * 60 or None,
+                      sleep_score=round(asleep / in_period * 100) if in_period else None,  # эффективность сна
+                      sleep_gap_s=gap or None, sleep_parts=len(segs))
 
     for p in _list("daily-heart-rate-variability", f'daily_heart_rate_variability.date >= "{start}"'):
         h = p.get("dailyHeartRateVariability") or {}

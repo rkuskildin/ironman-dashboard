@@ -93,7 +93,7 @@ def session():
 
 
 MIGRATIONS = {
-    "daily_health": {"bed_time": "TEXT", "wake_time": "TEXT"},
+    "daily_health": {"bed_time": "TEXT", "wake_time": "TEXT", "sleep_gap_s": "REAL", "sleep_parts": "INTEGER", "nap_s": "REAL"},
     "activities": {"start_gmt": "TEXT", "fitbit_avg_hr": "REAL", "fitbit_max_hr": "REAL", "analysis": "TEXT",
                    "moving_s": "REAL", "has_gps": "INTEGER", "parent_id": "TEXT", "kind": "TEXT"},
 }

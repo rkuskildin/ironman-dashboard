@@ -483,6 +483,8 @@ function readinessCard(r) {
     rec.hrv != null && { k: rec.hrv_z == null ? "" : rec.hrv_z < -1 ? "bad" : rec.hrv_z < -0.3 ? "warn" : "good", t: `HRV <b>${n0(rec.hrv)}</b> · норма ${rec.hrv_base ?? "—"}` },
     rec.rhr != null && { k: rec.rhr_z == null ? "" : rec.rhr_z > 1 ? "bad" : rec.rhr_z > 0.3 ? "warn" : "good", t: `Пульс покоя <b>${n0(rec.rhr)}</b> · норма ${rec.rhr_base ?? "—"}` },
     rec.sleep_h != null && { k: rec.sleep_perf < 75 ? "bad" : rec.sleep_perf < 90 ? "warn" : "good", t: `Сон <b>${rec.sleep_h} ч</b> из ${rec.sleep_need} нужных` },
+    rec.sleep_gap_min >= 20 && { k: rec.sleep_gap_min >= 60 ? "warn" : "", t: `Сон прерывался на <b>${fmtLate(rec.sleep_gap_min)}</b>` },
+    rec.nap_min && { k: "good", t: `Дневной сон <b>${rec.nap_min} мин</b>` },
     rec.bed_time && { k: rec.late_min > 90 ? "bad" : rec.late_min > 0 ? "warn" : "good", t: `Отбой <b>${rec.bed_time}</b>` },
     rec.yesterday_strain != null && { k: "", t: `Вчера нагрузка <b>${rec.yesterday_strain}</b>` },
   ].filter(Boolean);
@@ -598,7 +600,7 @@ async function renderToday() {
       <div class="card"><div class="card-h"><h3>${icon("heart")}Восстановление</h3><span class="meta">${rec ? "ночь на " + fmtShort(rec.date) : ""}</span></div>
           ${rec ? `<div class="src-tag">${SRC[rs]}</div><div class="mini-stats">
             <div class="stat"><div class="label">Сон</div><div class="value num">${hrs(rec.sleep_s)}<small>ч</small></div>
-              <div class="delta">${rec.deep_s ? `глуб. ${hrs(rec.deep_s)} · REM ${hrs(rec.rem_s)}` : ""}</div></div>
+              <div class="delta">${rec.deep_s ? `глуб. ${hrs(rec.deep_s)} · REM ${hrs(rec.rem_s)}` : ""}${rec.sleep_gap_s >= 1200 ? ` · перерыв ${fmtLate(Math.round(rec.sleep_gap_s / 60))}` : ""}</div></div>
             <div class="stat"><div class="label">Эффективность</div><div class="value num">${n0(rec.sleep_score)}<small>%</small></div></div>
             <div class="stat"><div class="label">HRV</div><div class="value num">${n0(rec.hrv)}<small>мс</small></div>
               <div class="delta ${hv != null && hv < -10 ? "t-bad" : ""}">${hv != null ? `${hv >= 0 ? "+" : ""}${hv}% к норме ${n0(rec.hrv_baseline)}` : ""}</div></div>
