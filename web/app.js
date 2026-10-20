@@ -1631,6 +1631,19 @@ async function renderSettings() {
     ${s.demo ? `<div class="alert" style="margin-bottom:16px"><span>ℹ</span><span>Сейчас открыт <b>демо-режим</b> со сгенерированными данными. Реальные данные — запуск без <code>IRONMAN_DEMO=1</code>.</span></div>` : ""}
     <div class="page-head"><div><h1>Источники</h1><div class="sub">подключения, пороги и журнал синхронизаций</div></div></div>
     <div class="card">${src.map(([k, name, desc, envName]) => {
+      if (k === "tp") {
+        const l = last[k];
+        return `<div class="src" style="flex-wrap:wrap"><div style="flex:1;min-width:260px"><div class="name">${name}</div><div class="muted" style="font-size:13px">${desc}</div>
+          ${l ? `<div style="font-size:12px;margin-top:4px" class="${l.ok ? "status-ok" : "status-bad"}">${l.ok ? "✓" : "✗"} ${esc(l.ts)} — ${esc(l.message)}</div>` : ""}
+          <details class="tp-cookie" ${l && !l.ok ? "open" : ""}><summary>Обновить вход (cookie)</summary>
+            <ol class="steps" style="font-size:13px;margin:8px 0">
+              <li>Откройте <a href="https://app.trainingpeaks.com" target="_blank" rel="noopener">app.trainingpeaks.com</a> и войдите.</li>
+              <li>Safari: «Разработка» → «Показать веб-инспектор» → «Хранилище» → Cookies. Chrome: <code>Cmd+Option+I</code> → Application → Cookies.</li>
+              <li>Скопируйте значение <b>Production_tpAuth</b> и вставьте сюда.</li></ol>
+            <form class="cmt-form" onsubmit="event.preventDefault();saveTpCookie(this)"><input name="c" type="password" placeholder="значение Production_tpAuth" autocomplete="off">
+              <button class="btn primary" type="submit">Сохранить и проверить</button></form></details></div>
+          <div>${s.configured[k] && (!l || l.ok) ? `<span class="pill"><span class="dot done"></span>настроен</span>` : `<span class="pill"><span class="dot missed"></span>нужен вход</span>`}</div></div>`;
+      }
       const l = last[k];
       return `<div class="src"><div><div class="name">${name}</div><div class="muted" style="font-size:13px">${desc}</div>
           ${l ? `<div style="font-size:12px;margin-top:4px" class="${l.ok ? "status-ok" : "status-bad"}">${l.ok ? "✓" : "✗"} ${esc(l.ts)} — ${esc(l.message)}</div>` : ""}</div>
@@ -1740,6 +1753,14 @@ addEventListener("scroll", () => (tip.hidden = true), { passive: true });
 let _annT;
 new MutationObserver(() => { if (_annotating) return; clearTimeout(_annT); _annT = setTimeout(() => annotate($("#app")), 60); })
   .observe(document.getElementById("app"), { childList: true, subtree: true });
+
+async function saveTpCookie(form) {
+  const b = form.querySelector("button"); b.disabled = true; toast("Проверяю вход в TrainingPeaks…", 30000);
+  try { const r = await api("tp-cookie", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cookie: form.c.value }) });
+    toast(r.ok ? `✓ ${r.message}` : `✗ ${r.message}`, 7000); if (r.ok) renderSettings();
+  } catch (e) { toast("Ошибка: " + e.message, 7000); }
+  b.disabled = false;
+}
 
 async function renderThresholds() {
   const t = await api("thresholds"), el = $("#thr-card"); if (!el) return;

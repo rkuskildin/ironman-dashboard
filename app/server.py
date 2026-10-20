@@ -60,7 +60,7 @@ app = FastAPI(title="Ironman Dashboard", lifespan=lifespan, docs_url=None, redoc
 PUBLIC = {"/login", "/api/login", "/setup", "/api/setup", "/api/invite", "/api/widget", "/styles.css", "/manifest.webmanifest", "/sw.js"}
 PUBLIC_PREFIX = ("/icons/",)
 # Тренер видит всё, но не меняет данные и не трогает подключения спортсмена
-COACH_DENY = (("POST", "/api/race-calendar"), ("POST", "/api/swim-fix"), ("PUT", "/api/goals"), ("PUT", "/api/thresholds"), ("PUT", "/api/race"), ("POST", "/api/weight"),
+COACH_DENY = (("POST", "/api/tp-cookie"), ("POST", "/api/race-calendar"), ("POST", "/api/swim-fix"), ("PUT", "/api/goals"), ("PUT", "/api/thresholds"), ("PUT", "/api/race"), ("POST", "/api/weight"),
               ("POST", "/api/exclude"), ("POST", "/api/manual"), ("DELETE", "/api/manual"), ("GET", "/api/fitbit"))
 
 
@@ -374,6 +374,17 @@ def swim_fix(source: str, source_id: str, body: dict):
     else:
         swim.set_fix(source, source_id, clear=True)
     return {"ok": True}
+
+
+@app.post("/api/tp-cookie")
+async def tp_cookie(body: dict):
+    from .connectors import trainingpeaks
+    v = (body.get("cookie") or "").strip()
+    if len(v) < 20:
+        raise HTTPException(400, "Похоже, это не cookie — скопируйте значение Production_tpAuth целиком")
+    trainingpeaks.set_cookie(v)
+    res = await asyncio.to_thread(sync.run, ["tp"])
+    return res[0] if res else {"ok": False, "message": "не запустилось"}
 
 
 @app.get("/api/race-calendar")

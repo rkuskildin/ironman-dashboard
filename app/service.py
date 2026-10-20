@@ -317,6 +317,10 @@ def overview() -> dict:
         alerts.append(f"Режим: лёг в {reg['last']['bed_time']} — на {late} позже {reg['target']}")
     if fit and fit[-1]["tsb"] < -30:
         alerts.append(f"Высокая усталость: TSB {fit[-1]['tsb']}")
+    with db.session() as c:
+        last_tp = c.execute("SELECT ok, message FROM sync_log WHERE source='tp' ORDER BY id DESC LIMIT 1").fetchone()
+    if last_tp and not last_tp["ok"] and "истёк" in (last_tp["message"] or ""):
+        alerts.append("TrainingPeaks отключился: вход истёк — новые тренировки от тренера не приходят. «Источники» → обновить cookie")
     from .connectors import fitbit as _fb
     if not _fb.connected() and config.FITBIT_TOKEN_FILE.with_suffix(".expired").exists():
         alerts.append("Fitbit отключился: вход в Google истёк — «Источники» → «Подключить»")

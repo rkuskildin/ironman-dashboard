@@ -13,7 +13,7 @@ from .connectors import fitbit, garmin, trainingpeaks
 def configured() -> dict[str, bool]:
     return {
         "tp_ical": bool(config.TP_ICAL_URL),
-        "tp": bool(config.TP_AUTH_COOKIE),
+        "tp": bool(trainingpeaks.current_cookie()),
         "garmin": config.GARMIN_TOKEN_DIR.exists(),  # только после ручного garmin-login
         "fitbit": fitbit.connected(),
     }

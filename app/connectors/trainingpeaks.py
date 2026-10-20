@@ -73,7 +73,9 @@ class TPClient:
         r = self.http.get("/users/v3/token", cookies={"Production_tpAuth": auth_cookie})
         if r.status_code != 200:
             raise RuntimeError("TrainingPeaks не принял cookie — войдите на сайт заново и обновите TP_AUTH_COOKIE")
-        token = r.json()["token"]["access_token"]
+        token = ((r.json() or {}).get("token") or {}).get("access_token")
+        if not token:
+            raise RuntimeError("Вход в TrainingPeaks истёк — обновите cookie: «Источники» → TrainingPeaks")
         self.http.headers["Authorization"] = f"Bearer {token}"
         self.athlete_id = self.http.get("/users/v3/user").json()["user"]["userId"]
 
@@ -99,10 +101,25 @@ def _h(v):
     return v * 3600 if v else None
 
 
+def current_cookie() -> str:
+    """Cookie из панели («Источники») главнее, чем из .env."""
+    with db.session() as c:
+        c.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+        row = c.execute("SELECT value FROM settings WHERE key='tp_cookie'").fetchone()
+    return (row and row["value"]) or config.TP_AUTH_COOKIE
+
+
+def set_cookie(value: str):
+    value = value.strip().removeprefix("Production_tpAuth=").strip().strip('"')
+    with db.session() as c:
+        c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('tp_cookie', ?)", (value,))
+
+
 def sync_api(days_back: int, days_forward: int) -> str:
-    if not config.TP_AUTH_COOKIE:
-        raise RuntimeError("TP_AUTH_COOKIE не задан в .env")
-    tp = TPClient(config.TP_AUTH_COOKIE)
+    cookie = current_cookie()
+    if not cookie:
+        raise RuntimeError("Нет cookie TrainingPeaks — добавьте его во вкладке «Источники»")
+    tp = TPClient(cookie)
     start = date.today() - timedelta(days=days_back)
     end = date.today() + timedelta(days=days_forward)
     plans = acts = 0
