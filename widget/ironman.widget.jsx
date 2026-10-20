@@ -7,7 +7,7 @@ import { css, run } from "uebersicht";
 const TOP = 186;
 const LEFT = 376;
 
-export const refreshFrequency = 15 * 60 * 1000; // раз в 15 минут
+export const refreshFrequency = 5 * 60 * 1000; // раз в 5 минут
 
 export const command = `
   DIR="$HOME/.config/ironman-widget"
@@ -16,7 +16,8 @@ export const command = `
 `;
 
 const ZONE = { green: "#3ecf5a", yellow: "#f5c03b", red: "#ff6159" };
-const SPORT = { run: "🏃", bike: "🚴", swim: "🏊", strength: "💪", hockey: "🏒", football: "⚽", rest: "🌙", other: "•" };
+const SPORT = { run: "🏃", bike: "🚴", swim: "🏊", strength: "💪", hockey: "🏒", football: "⚽", rest: "🌙", trail: "⛰️", transition: "🔁", other: "🚶" };
+const SPORT_RU = { run: "бег", bike: "вело", swim: "плавание", strength: "силовая", hockey: "хоккей", football: "футбол", other: "активность" };
 const STATUS = { done: "✓", partial: "◐", off: "≠", missed: "✗", today: "", upcoming: "", unplanned: "+", rest: "" };
 
 const ru = (v) => (v == null ? "—" : String(v).replace(".", ","));
@@ -48,7 +49,9 @@ export const render = ({ output, error }) => {
   if (error || !d || d.detail) {
     return <div className={card}><div className={muted}>Ironman: нет связи с панелью{d && d.detail ? ` — ${d.detail}` : ""}</div></div>;
   }
-  const w = (d.workouts || [])[0];
+  const w = (d.workouts || []).find((x) => x.sport !== "rest") || null;
+  const extra = (d.done || []).filter((x) => !x.planned);
+  const stale = (() => { const [h, m] = (d.updated || "0:0").split(":").map(Number); const n = new Date(); return n.getHours() * 60 + n.getMinutes() - (h * 60 + m) > 60; })();
   const short = (m) => (m >= 90 ? `${ru(Math.round(m / 6) / 10)} ч` : `${m} мин`);
   // спокойная работа, если влезает в 2,5 ч; иначе — сколько нужно в Z4
   const useZ2 = d.remaining_z2_min <= 150;
@@ -64,13 +67,18 @@ export const render = ({ output, error }) => {
       <div className={info}>
         {w ? (
           <div>
-            <div className={title}>{SPORT[w.sport] || "•"} {w.title}{STATUS[w.status] ? ` ${STATUS[w.status]}` : ""}</div>
-            <div className={muted}>{[w.minutes && `≈${w.minutes} мин`, d.planned_strain && `нагрузка ≈${ru(d.planned_strain)}`].filter(Boolean).join(" · ")}{d.over_plan ? " · много" : ""}</div>
+            <div className={title}>{SPORT[w.sport] || "•"} {w.title}{w.status === "done" || w.status === "partial" ? " ✓" : ""}</div>
+            <div className={muted}>{[w.distance_km && `${ru(w.distance_km)} км`, w.minutes && `≈${w.minutes} мин`, d.planned_strain && `нагрузка ≈${ru(d.planned_strain)}`].filter(Boolean).join(" · ")}{d.over_plan ? " · много" : ""}</div>
           </div>
-        ) : <div className={title}>Сегодня без тренировки</div>}
+        ) : (
+          <div>
+            <div className={title}>🌙 По плану отдых</div>
+            <div className={muted}>{extra.length ? `сделано: ${extra.map((x) => `${(x.title || SPORT_RU[x.sport] || "").toLowerCase()} ${x.minutes} мин`).join(", ")}` : "тренер ничего не поставил"}</div>
+          </div>
+        )}
         <div className={line}>{left}</div>
-        <div className={foot}>{d.hr_stale ? `⚠ пульс до ${d.hr_updated}` : `HRV ${Math.round(d.hrv || 0)} · сон ${ru(d.sleep_h)} ч`} · отбой {d.bed_time || "—"}</div>
-        <div className={foot}>До старта {d.days_left} дн · CTL {d.ctl ?? "—"}</div>
+        <div className={foot}>{d.hr_stale ? `⚠ пульс до ${d.hr_updated} · ` : ""}сон {ru(d.sleep_h)} ч · отбой {d.bed_time || "—"}</div>
+        <div className={foot}>HRV {Math.round(d.hrv || 0)} · CTL {d.ctl ?? "—"} · {d.days_left} дн · {stale ? "⚠ " : ""}обн. {d.updated}</div>
       </div>
     </div>
   );
