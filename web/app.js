@@ -823,7 +823,7 @@ const km = (m, sport) => (sport === "swim" ? `${n0(m)} м` : `${(m / 1000).toFix
 
 let goalTab = "summary";
 async function renderGoal() {
-  const sub = (location.hash.split("/")[1] || goalTab);
+  const sub = location.hash.split("/")[1] || "summary";  // «#goal» — всегда «Свод»
   const TABS = [["summary", "Свод", "flag"], ["path", "Путь", "trend"], ["swim", "Плавание", "swim"], ["bike", "Велосипед", "bike"],
     ["run", "Бег", "run"], ["records", "Рекорды", "target"], ["race", "Гонка", "flag"], ["gear", "Снаряжение", "sliders"]];
   goalTab = TABS.some((t) => t[0] === sub) ? sub : "summary";
@@ -831,7 +831,10 @@ async function renderGoal() {
   const tabs = `<div class="seg goal-tabs">${TABS.map(([k, l, ic]) => `<button data-t="${k}" class="${k === goalTab ? "on" : ""}">${icon(ic)}${l}</button>`).join("")}</div>`;
   const R = { summary: renderGoalSummary, path: renderPath, records: renderRecords, race: renderRace, gear: renderGear };
   if (R[goalTab]) await R[goalTab](el, tabs); else await renderDiscipline(el, tabs, goalTab);
-  el.querySelectorAll(".goal-tabs button").forEach((b) => (b.onclick = () => { location.hash = b.dataset.t === "summary" ? "#goal" : "#goal/" + b.dataset.t; }));
+  el.querySelectorAll(".goal-tabs button").forEach((b) => (b.onclick = () => {
+    const h = b.dataset.t === "summary" ? "#goal" : "#goal/" + b.dataset.t;
+    if (location.hash === h) renderGoal(); else location.hash = h;
+  }));
 }
 
 function splitBar(label, parts, total, scale) {
