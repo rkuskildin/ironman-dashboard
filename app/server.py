@@ -57,7 +57,7 @@ async def lifespan(_app):
 app = FastAPI(title="Ironman Dashboard", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 # Без входа доступны только страница логина и её оформление
-PUBLIC = {"/login", "/api/login", "/setup", "/api/setup", "/api/invite", "/api/widget", "/styles.css", "/manifest.webmanifest", "/sw.js"}
+PUBLIC = {"/login", "/api/login", "/setup", "/api/setup", "/api/invite", "/api/widget", "/privacy", "/styles.css", "/manifest.webmanifest", "/sw.js"}
 PUBLIC_PREFIX = ("/icons/",)
 # Тренер видит всё, но не меняет данные и не трогает подключения спортсмена
 COACH_DENY = (("POST", "/api/tp-cookie"), ("POST", "/api/race-calendar"), ("POST", "/api/swim-fix"), ("PUT", "/api/goals"), ("PUT", "/api/thresholds"), ("PUT", "/api/race"), ("POST", "/api/weight"),
@@ -144,6 +144,11 @@ def api_logout(request: Request):
 def me(request: Request):
     u = getattr(request.state, "user", None) or {"login": "demo", "name": "", "role": "athlete"}
     return {**u, "role_name": auth.ROLES.get(u["role"], u["role"])}
+
+
+@app.get("/privacy")
+def privacy_page():
+    return FileResponse(WEB / "privacy.html")
 
 
 @app.get("/login")
