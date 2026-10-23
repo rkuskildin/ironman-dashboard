@@ -1,56 +1,33 @@
 /* ============ токены ============ */
+/* Тёмная спортивная тема (макет из Claude Design): графит, салатовый акцент, цвета дисциплин */
 :root {
-  color-scheme: light;
-  --page: #f6f6f3;
-  --surface: #ffffff;
-  --surface-2: #f2f1ed;
-  --surface-3: #e9e8e3;
-  --ink: #111110;
-  --ink-2: #4f4e4a;
-  --muted: #8a8983;
-  --grid: #ecebe6;
-  --axis: #c9c8c0;
-  --border: rgba(17, 17, 16, 0.08);
-  --shadow: 0 1px 2px rgba(17, 17, 16, .04), 0 2px 8px rgba(17, 17, 16, .04);
-  --accent: #2a78d6;
-  --accent-soft: #e6f0fc;
-  /* виды спорта — категориальные слоты */
-  --swim: #2a78d6; --bike: #eb6834; --run: #1baf7a; --strength: #eda100;
-  --hockey: #4a3aa7; --football: #e87ba4; --other: #8a8983;
-  /* серии графиков */
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
-  /* статусы */
-  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
-  --good-ink: #006300; --warn-ink: #8a5a00; --bad-ink: #b42323;
-  --good-soft: #e8f6e8; --warn-soft: #fdf3dc; --bad-soft: #fbe9e9;
-  --radius: 16px;
-  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --page: #0f0f0e; --surface: #1a1a19; --surface-2: #232321; --surface-3: #2c2c2a;
-    --ink: #f5f5f2; --ink-2: #c3c2b7; --muted: #8a8983;
-    --grid: #2a2a28; --axis: #3c3c39; --border: rgba(255, 255, 255, 0.08);
-    --shadow: none;
-    --accent: #3987e5; --accent-soft: #1b2b40;
-    --swim: #3987e5; --bike: #d95926; --run: #199e70; --strength: #c98500; --hockey: #9085e9; --football: #d55181;
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
-    --good-ink: #3ec43e; --warn-ink: #f2b53a; --bad-ink: #f07272;
-    --good-soft: #15291a; --warn-soft: #2e2510; --bad-soft: #321616;
-  }
-}
-:root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #0f0f0e; --surface: #1a1a19; --surface-2: #232321; --surface-3: #2c2c2a;
-  --ink: #f5f5f2; --ink-2: #c3c2b7; --muted: #8a8983;
-  --grid: #2a2a28; --axis: #3c3c39; --border: rgba(255, 255, 255, 0.08);
+  --page: #0f1115;
+  --surface: #171a20;
+  --surface-2: #1f232b;
+  --surface-3: #2a2f38;
+  --ink: #f1f2f4;
+  --ink-2: #d5d9df;
+  --muted: #a2a9b3;
+  --grid: #23272f;
+  --axis: #3a3f48;
+  --border: #262a32;
   --shadow: none;
-  --accent: #3987e5; --accent-soft: #1b2b40;
-  --swim: #3987e5; --bike: #d95926; --run: #199e70; --strength: #c98500; --hockey: #9085e9; --football: #d55181;
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
-  --good-ink: #3ec43e; --warn-ink: #f2b53a; --bad-ink: #f07272;
-  --good-soft: #15291a; --warn-soft: #2e2510; --bad-soft: #321616;
+  --accent: #c8f04a;
+  --accent-ink: #0f1115;
+  --accent-soft: #232c17;
+  /* виды спорта — категориальные слоты */
+  --swim: #4fb3ff; --bike: #ffb84d; --run: #ff6f59; --strength: #b28cff;
+  --hockey: #8e9bff; --football: #ff7fb0; --other: #8a919b;
+  /* серии графиков */
+  --s1: #5aa9ff; --s2: #ffb84d; --s3: #c8f04a;
+  /* статусы */
+  --good: #7ed957; --warning: #f5c44e; --serious: #ff8a5c; --critical: #ff5c5c;
+  --good-ink: #9be36b; --warn-ink: #f5c44e; --bad-ink: #ff8a7a;
+  --good-soft: #1b2a16; --warn-soft: #2e2510; --bad-soft: #351919;
+  --radius: 20px;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: "Barlow Condensed", "Inter", system-ui, sans-serif;
 }
 
 /* ============ база ============ */
@@ -102,7 +79,7 @@ main { margin-left: 228px; padding: 28px 32px 48px; max-width: 1360px; }
   display: inline-flex; align-items: center; gap: 8px; justify-content: center;
 }
 .btn:hover { background: var(--surface-2); }
-.btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); font-weight: 700; border-color: transparent; }
 .btn.primary:hover { filter: brightness(1.06); }
 .btn.ghost { background: transparent; }
 .btn.full { width: 100%; justify-content: flex-start; }
@@ -259,7 +236,7 @@ main { margin-left: 228px; padding: 28px 32px 48px; max-width: 1360px; }
 .zlegend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--ink-2); margin-top: 5px; }
 .zlegend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
 .z1 { background: #86b6ef; } .z2 { background: #5598e7; } .z3 { background: #2a78d6; } .z4 { background: #1c5cab; } .z5 { background: #104281; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .z5 { background: #184f95; } }
+.z5 { background: #184f95; }
 :root[data-theme="dark"] .z5 { background: #184f95; }
 .bal { margin-bottom: 10px; }
 .bal-h { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
@@ -449,7 +426,7 @@ ol.steps { padding-left: 20px; margin: 0; } ol.steps li { margin: 6px 0; }
 @media (max-width: 760px) { .map-big { height: 320px; } }
 /* подложка OSM: приглушённая, чтобы маршрут читался; в тёмной теме — инверсия */
 .osm-tiles { filter: grayscale(.85) contrast(.9) brightness(1.04); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .osm-tiles { filter: grayscale(1) invert(1) brightness(.85) contrast(.9); } }
+.osm-tiles { filter: grayscale(1) invert(1) brightness(.85) contrast(.9); }
 :root[data-theme="dark"] .osm-tiles { filter: grayscale(1) invert(1) brightness(.85) contrast(.9); }
 
 /* ============ пояснения терминов ============ */
@@ -481,7 +458,7 @@ ol.steps { padding-left: 20px; margin: 0; } ol.steps li { margin: 6px 0; }
 .phases .now { position: absolute; top: -14px; bottom: -6px; width: 2px; background: var(--critical); }
 .phases .now b { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10.5px; color: var(--bad-ink); white-space: nowrap; font-style: normal; }
 .phase-dates { display: flex; justify-content: space-between; font-size: 12px; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .phase.ph0, :root:not([data-theme="light"]) .phase.ph1, :root:not([data-theme="light"]) .phase.ph3 { color: #10213a; } }
+.phase.ph0, .phase.ph1, .phase.ph3 { color: #10213a; }
 .desc-plain { margin-top: 12px; font-size: 13px; color: var(--ink-2); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
 .milestone { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 13.5px; }
 .milestone + .milestone { border-top: 1px solid var(--border); }
@@ -561,7 +538,7 @@ tr.cur-row td { background: var(--accent-soft); }
 .whoop-text .verdict { font-size: 16.5px; font-weight: 600; letter-spacing: -.01em; }
 .whoop-left { margin: 6px 0 8px; font-size: 13.5px; color: var(--ink-2); }
 .whoop-left b, .whoop-plan b { color: var(--ink); }
-.whoop-plan { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 8px; color: var(--ink-2); }
+.whoop-plan { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; margin-bottom: 8px; color: var(--ink-2); }
 .whoop-plan .ico { width: 15px; height: 15px; color: var(--muted); }
 .whoop .factor b { font-weight: 600; }
 @media (max-width: 760px) {
@@ -665,3 +642,49 @@ tr.cur-row td { background: var(--accent-soft); }
 .eval-pill.r1, .eval-pill.r2 { background: var(--bad-soft); color: var(--bad-ink); }
 .eval-pill.r4, .eval-pill.r5 { background: var(--good-soft, var(--accent-soft)); color: var(--good-ink, var(--accent)); }
 .push-btn.on { color: var(--accent); }
+
+/* ============ оформление по макету ============ */
+.card { border-radius: var(--radius); padding: 20px 22px; }
+.card-h h3 { font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.card-h h3 .ico { color: var(--muted); }
+.page-head h1 { font-family: var(--display); font-weight: 700; font-size: 40px; line-height: 1.02; letter-spacing: .005em; }
+.page-head .sub { font-size: 13px; }
+.stat .value, .race-pill b, .mini-stats .stat .value { font-family: var(--display); font-weight: 700; letter-spacing: .005em; }
+.stat .value { font-size: 28px; }
+.kpi .stat .value { font-size: 36px; }
+.stat .label { text-transform: uppercase; letter-spacing: .06em; font-size: 11.5px; font-weight: 600; }
+.ring-val { font-family: var(--display); font-weight: 700; font-size: 34px; letter-spacing: 0; }
+.ring-label { text-transform: uppercase; letter-spacing: .06em; font-size: 11.5px; color: var(--muted); }
+.wo-today .t { font-family: var(--display); font-size: 24px; font-weight: 700; letter-spacing: .005em; line-height: 1.1; }
+.ready .verdict { font-family: var(--display); font-size: 22px; font-weight: 700; letter-spacing: .005em; }
+
+.sidebar { background: var(--page); border-right-color: var(--grid); }
+.brand b { font-family: var(--display); font-size: 21px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.tabs a { min-height: 44px; border-radius: 12px; font-weight: 600; color: var(--muted); }
+.tabs a:hover { background: var(--surface); color: var(--ink); }
+.tabs a.active { background: var(--surface-2); color: var(--ink); box-shadow: inset 3px 0 0 var(--accent); }
+.tabs a.active svg { color: var(--accent); }
+.btn { border-radius: 12px; min-height: 40px; }
+.icon-btn { border-radius: 12px; width: 44px; height: 44px; }
+.pill { background: var(--surface-2); }
+.seg { border-radius: 12px; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); box-shadow: none; font-weight: 600; }
+.toast { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.workout:hover { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.workout .t { font-size: 14.5px; }
+.cmt.coach, .eval { background: var(--accent-soft); }
+.eval { border: 1px solid #3f511b; }
+.eval-stars, .eval-pick button.on { color: var(--warning); }
+input, select, textarea { color-scheme: dark; }
+
+@media (max-width: 760px) {
+  .tabs { background: #14171c; border-top-color: var(--grid); }
+  .tabs a { min-height: 50px; color: var(--muted); min-width: 0; font-size: 10px; padding: 5px 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tabs a span { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .tabs a.active { background: transparent; box-shadow: none; color: var(--accent); }
+  .mobile-bar { background: var(--page); border-bottom-color: var(--grid); }
+  .page-head h1 { font-size: 32px; }
+}
+.whoop-text { min-width: 0; }
+.whoop-text .verdict { font-family: var(--display); font-size: 24px; font-weight: 700; letter-spacing: .005em; line-height: 1.15; }
+.whoop-plan .ico { margin-top: 2px; }

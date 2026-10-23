@@ -534,8 +534,8 @@ function readinessCard(r) {
     <div class="whoop-text">
       <div class="verdict">${zoneText}</div>
       <div class="whoop-left">${left}</div>
-      ${r.planned.length ? `<div class="whoop-plan ${r.over_plan ? "t-bad" : ""}">${icon("calendar")}По плану: ${r.planned.map((p) => esc(p.title || SPORT[p.sport]?.name)).join(", ")} —
-        нагрузка ≈ <b>${r.planned_strain}</b>${r.over_plan ? ` · выше оптимума ${r.target[1]}, стоит обсудить облегчение с тренером` : " · укладывается в оптимум"}</div>` : ""}
+      ${r.planned.length ? `<div class="whoop-plan ${r.over_plan ? "t-bad" : ""}">${icon("calendar")}<span>По плану: ${r.planned.map((p) => esc(p.title || SPORT[p.sport]?.name)).join(", ")} —
+        нагрузка ≈ <b>${r.planned_strain}</b>${r.over_plan ? ` · выше оптимума ${r.target[1]}, стоит обсудить облегчение с тренером` : " · укладывается в оптимум"}</span></div>` : ""}
       <div class="factors">${fx.map((x) => `<span class="factor ${x.k}"><i></i>${x.t}</span>`).join("")}</div>
       ${r.hr_stale_min > 60 ? `<div class="stale">${icon("alert")}<span>Пульс есть только до <b>${r.hr_updated || "начала дня"}</b> — браслет и часы с тех пор не синхронизировались.
         Откройте приложение Fitbit (или Garmin Connect) на телефоне — нагрузка дня сейчас неполная.</span></div>` : ""}
@@ -788,7 +788,7 @@ let _lthr = LTHR_DEFAULT;
 let _zones = null;
 const hrZone = (hr) => { if (_zones) { let z = 0; _zones.forEach((f, i) => { if (hr >= f) z = i; }); return z; }
   const r = hr / _lthr; return r < 0.85 ? 0 : r < 0.9 ? 1 : r < 0.95 ? 2 : r < 1 ? 3 : 4; };
-const dark = () => matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.theme !== "light";
+const dark = () => true;  // панель всегда в тёмной теме
 function baseMap(el) {
   const m = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
