@@ -33,6 +33,7 @@ const ICONS = {
   chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
   print: '<path d="M6 9V2h12v7"/><rect x="6" y="14" width="12" height="8" rx="1"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>',
   scale: '<path d="M6 3h12l3 18H3z"/><path d="M12 8v4"/><circle cx="12" cy="13" r="1"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
 };
 const icon = (name, cls = "") => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.other}</svg>`;
@@ -324,24 +325,55 @@ function workoutRow(row) {
       ${a ? `<div class="muted" style="font-size:12px;margin-top:4px">Источник: ${esc(a.source)}</div>` : ""}
       ${a ? `<label class="excl athlete-only"><input type="checkbox" ${a.excluded ? "checked" : ""}
         onchange="toggleExclude('${esc(a.source)}','${esc(a.source_id)}',this.checked)"> Не учитывать в статистике (сбойная запись: неверная длина бассейна, GPS)</label>` : ""}
+      ${(p || a) && row.date <= iso(new Date()) ? evalHtml(commentKey(row)) : ""}
       <div class="thread" data-key="${esc(commentKey(row))}" data-date="${row.date}"></div>
     </div>`;
   return `<div class="workout" ${row._k != null ? `id="w-${row._k}"` : ""} style="--c:${sportColor(row.sport)}" onclick="if(!event.target.closest('.details')){this.classList.toggle('open');openMaps(this)}">
       <div class="bar" style="background:${sportColor(row.sport)}"></div>
       <div><div class="t">${sp.ico}${esc(title)}</div><div class="meta num">${meta.join(" &nbsp;·&nbsp; ") || sp.name}</div></div>
-      <div class="wo-right">${(_comments[row.planned || row.actual ? commentKey(row) : ""] || []).length ? `<span class="pill cmt-pill">${icon("chat")}${_comments[commentKey(row)].length}</span>` : ""}${statusPill(row)}</div>
+      <div class="wo-right">${(row.planned || row.actual) && _evals[commentKey(row)] ? `<span class="pill eval-pill r${_evals[commentKey(row)].rating}" title="Оценка тренера">★ ${_evals[commentKey(row)].rating}</span>` : ""}${(_comments[row.planned || row.actual ? commentKey(row) : ""] || []).length ? `<span class="pill cmt-pill">${icon("chat")}${_comments[commentKey(row)].length}</span>` : ""}${statusPill(row)}</div>
       ${details}
     </div>`;
 }
 
 // ---------- комментарии к тренировкам ----------
 const commentKey = (row) => row.planned ? `p:${row.planned.source}:${row.planned.source_id}` : `a:${row.actual.source}:${row.actual.source_id}`;
-let _me = null, _comments = {};
+let _me = null, _comments = {}, _evals = {};
 async function loadComments(start, end) {
-  const list = await api(`comments?start=${start}&end=${end}`);
-  _comments = {};
+  const [list, ev] = await Promise.all([api(`comments?start=${start}&end=${end}`), api(`evaluations?start=${start}&end=${end}`).catch(() => [])]);
+  _comments = {}; _evals = {};
   list.forEach((c) => (_comments[c.key] ||= []).push(c));
+  ev.forEach((e) => (_evals[e.key] = e));
   return list;
+}
+const stars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
+const EVAL_WORD = { 1: "плохо", 2: "слабо", 3: "нормально", 4: "хорошо", 5: "отлично" };
+function evalHtml(key) {
+  const e = _evals[key], coach = _me?.role === "coach";
+  if (!coach) return e ? `<div class="eval"><div class="eval-h"><span class="eval-stars r${e.rating}">${stars(e.rating)}</span><b>${EVAL_WORD[e.rating]}</b><span class="muted">${esc(e.author_name)} · ${e.updated.slice(8, 10)}.${e.updated.slice(5, 7)}</span></div>${e.text ? `<div>${esc(e.text)}</div>` : ""}</div>` : "";
+  const r = e?.rating || 0;
+  return `<form class="eval eval-edit" data-rating="${r}" onsubmit="event.preventDefault();saveEval(this)" onclick="event.stopPropagation()">
+    <div class="eval-h"><b>Оценка тренировки</b>${e ? `<span class="muted">сохранено ${e.updated.slice(8, 10)}.${e.updated.slice(5, 7)}</span>` : ""}</div>
+    <div class="eval-pick">${[1, 2, 3, 4, 5].map((i) => `<button type="button" class="${i <= r ? "on" : ""}" onclick="pickStar(this,${i})" aria-label="${i}">★</button>`).join("")}<span class="muted eval-word">${EVAL_WORD[r] || "поставьте оценку"}</span></div>
+    <textarea name="t" rows="2" placeholder="Что получилось, что поправить…">${esc(e?.text || "")}</textarea>
+    <div style="display:flex;gap:8px"><button class="btn primary" type="submit">${e ? "Обновить" : "Отправить спортсмену"}</button>${e ? `<button class="btn ghost" type="button" onclick="delEval(this)">Убрать</button>` : ""}</div>
+  </form>`;
+}
+function pickStar(b, i) {
+  const f = b.closest("form"); f.dataset.rating = i;
+  f.querySelectorAll(".eval-pick button").forEach((x, k) => x.classList.toggle("on", k < i));
+  f.querySelector(".eval-word").textContent = EVAL_WORD[i];
+}
+async function saveEval(f) {
+  const th = f.closest(".details").querySelector(".thread"), rating = +f.dataset.rating;
+  if (!rating) return toast("Поставьте оценку от 1 до 5");
+  const e = await api("evaluations", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: th.dataset.key, date: th.dataset.date, rating, text: f.t.value }) });
+  _evals[e.key] = e; f.outerHTML = evalHtml(e.key); toast("Оценка отправлена спортсмену");
+}
+async function delEval(b) {
+  const th = b.closest(".details").querySelector(".thread");
+  await api(`evaluations?key=${encodeURIComponent(th.dataset.key)}`, { method: "DELETE" });
+  delete _evals[th.dataset.key]; b.closest("form").outerHTML = evalHtml(th.dataset.key);
 }
 const commentHtml = (c) => `<div class="cmt ${c.role}"><div class="cmt-h"><b>${esc(c.author_name)}</b><span class="muted">${c.role === "coach" ? "тренер" : "спортсмен"} · ${esc(`${c.created.slice(8, 10)}.${c.created.slice(5, 7)} в ${c.created.slice(11, 16)}`)}</span>
   ${_me && c.author === _me.login ? `<button class="cmt-del" onclick="event.stopPropagation();delComment(${c.id})" title="Удалить">×</button>` : ""}</div><div>${esc(c.text)}</div></div>`;
@@ -1829,11 +1861,41 @@ async function whoami() {
   document.body.classList.toggle("role-coach", me.role === "coach");
   $("#user-box").innerHTML = `<div class="avatar">${esc((me.name || me.login)[0].toUpperCase())}</div>
     <div><b>${esc(me.name || me.login)}</b><span class="muted">${esc(me.role_name)}</span></div>
+    <button class="icon-btn push-btn" title="Уведомления на телефон" aria-label="Уведомления">${icon("bell")}</button>
     <button class="icon-btn" id="logout" title="Выйти" aria-label="Выйти">${icon("logout")}</button>`;
   $("#logout").onclick = logout;
+  document.querySelectorAll(".push-btn").forEach((b) => (b.onclick = togglePush));
+  pushState();
   const lm = $("#logout-m"); if (lm) lm.onclick = logout;
   if (me.role === "coach" && location.hash.startsWith("#settings")) location.hash = "#today";
 }
+// ---------- push-уведомления ----------
+const b64u = (s) => Uint8Array.from(atob((s + "===".slice((s.length + 3) % 4)).replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+async function pushSub() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+async function pushState() {
+  const on = !!(await pushSub().catch(() => null)) && Notification.permission === "granted";
+  document.querySelectorAll(".push-btn").forEach((b) => { b.classList.toggle("on", on); b.title = on ? "Уведомления включены — нажмите, чтобы выключить" : "Включить уведомления на телефон"; });
+}
+async function togglePush() {
+  if (!("PushManager" in window)) return toast("Браузер не поддерживает уведомления. На iPhone: «Поделиться» → «На экран Домой», затем откройте панель с иконки");
+  const cur = await pushSub();
+  if (cur && Notification.permission === "granted") {
+    await api("push/unsubscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: cur.endpoint }) });
+    await cur.unsubscribe(); pushState(); return toast("Уведомления выключены");
+  }
+  if (await Notification.requestPermission() !== "granted") return toast("Уведомления запрещены в настройках браузера для этого сайта");
+  const reg = await navigator.serviceWorker.ready, { key } = await api("push/key");
+  const sub = cur || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(key) });
+  await api("push/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sub.toJSON()) });
+  await api("push/test", { method: "POST" });
+  pushState();
+  toast(_me?.role === "coach" ? "Готово: придёт уведомление о каждой новой тренировке" : "Готово: придут оценки и комментарии тренера");
+}
+
 async function logout() {
   await fetch("/api/logout", { method: "POST" });
   try { for (const k of await caches.keys()) await caches.delete(k); } catch {}

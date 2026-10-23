@@ -43,6 +43,17 @@ def run(sources: list[str] | None = None) -> list[dict]:
     return results
 
 
+def recent_activities():
+    """Лёгкая проверка: только тренировки с Garmin за вчера и сегодня."""
+    from datetime import date, timedelta
+    if not configured()["garmin"]:
+        return
+    try:
+        garmin.sync_activities(garmin.login(), date.today() - timedelta(days=1))
+    except Exception as e:
+        db.log("garmin", False, f"{e.__class__.__name__}: {e}")
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "garmin-login":

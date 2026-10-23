@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import auth, config, db, extras, goals, manual, race_calendar, recovery, service, sync, thresholds
+from . import auth, config, db, extras, goals, manual, notify, race_calendar, recovery, service, sync, thresholds
 from .connectors import fitbit
 
 WEB = config.ROOT / "web"
@@ -32,9 +32,17 @@ async def _refresh_races():
 
 
 async def _background_sync():
+    # раз в 10 минут — только свежие тренировки с часов (для уведомления тренеру), раз в час — всё
+    quick, ticks = 10, 0
     while True:
-        await asyncio.sleep(config.SYNC_INTERVAL_MIN * 60)
-        await asyncio.to_thread(sync.run)
+        await asyncio.sleep(quick * 60)
+        ticks += quick
+        if ticks >= config.SYNC_INTERVAL_MIN:
+            ticks = 0
+            await asyncio.to_thread(sync.run)
+        else:
+            await asyncio.to_thread(sync.recent_activities)
+        await asyncio.to_thread(notify.new_workouts)
         if race_calendar.due():  # календарь стартов — раз в сутки ночью
             asyncio.create_task(_refresh_races())
 
@@ -46,6 +54,7 @@ async def lifespan(_app):
     extras.init()
     recovery.init()
     race_calendar.init()
+    notify.init()
     task = None
     if config.SYNC_INTERVAL_MIN > 0 and not config.DEMO:
         task = asyncio.create_task(_background_sync())
@@ -299,12 +308,81 @@ def get_comments(start: str = "", end: str = "", recent: int = 0):
     return extras.comments(start, end)
 
 
+def _push_bg(*args, **kw):
+    asyncio.get_running_loop().run_in_executor(None, lambda: notify.send(*args, **kw))
+
+
 @app.post("/api/comments")
-def post_comment(c: CommentIn, request: Request):
+async def post_comment(c: CommentIn, request: Request):
+    u = request.state.user
     try:
-        return extras.add_comment(request.state.user, c.key, c.date, c.text)
+        out = extras.add_comment(u, c.key, c.date, c.text)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    to = "athlete" if u["role"] == "coach" else "coach"
+    _push_bg(to, f"Комментарий: {out['author_name']}", out["text"][:180], "/#calendar")
+    return out
+
+
+class EvaluationIn(BaseModel):
+    key: str
+    date: str
+    rating: int
+    text: str = ""
+
+
+@app.get("/api/evaluations")
+def get_evaluations(start: str, end: str):
+    return extras.evaluations(start, end)
+
+
+@app.put("/api/evaluations")
+async def put_evaluation(e: EvaluationIn, request: Request):
+    u = request.state.user
+    if u["role"] != "coach":
+        raise HTTPException(403, "Оценку ставит тренер")
+    try:
+        out = extras.set_evaluation(u, e.key, e.date, e.rating, e.text)
+    except ValueError as err:
+        raise HTTPException(400, str(err))
+    stars = "★" * out["rating"] + "☆" * (5 - out["rating"])
+    _push_bg("athlete", f"Тренер оценил тренировку {stars}", out["text"][:180] or "Без комментария", "/#calendar")
+    return out
+
+
+@app.delete("/api/evaluations")
+def del_evaluation(key: str, request: Request):
+    if request.state.user["role"] != "coach":
+        raise HTTPException(403, "Оценку ставит тренер")
+    extras.delete_evaluation(key)
+    return {"ok": True}
+
+
+@app.get("/api/push/key")
+def push_key():
+    return {"key": notify.public_key()}
+
+
+@app.post("/api/push/subscribe")
+def push_subscribe(sub: dict, request: Request):
+    try:
+        notify.subscribe(request.state.user, sub)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.post("/api/push/unsubscribe")
+def push_unsubscribe(body: dict, request: Request):
+    notify.unsubscribe(request.state.user, str(body.get("endpoint", "")))
+    return {"ok": True}
+
+
+@app.post("/api/push/test")
+def push_test(request: Request):
+    u = request.state.user
+    n = notify.send(u["role"], "Ironman", "Уведомления работают ✓", "/", login=u["login"])
+    return {"sent": n}
 
 
 @app.delete("/api/comments/{cid}")

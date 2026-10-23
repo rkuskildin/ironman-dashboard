@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS comments (
     created TEXT DEFAULT (datetime('now','localtime'))
 );
 CREATE INDEX IF NOT EXISTS comments_date ON comments(date);
+CREATE TABLE IF NOT EXISTS evaluations (
+    key TEXT PRIMARY KEY, date TEXT NOT NULL, rating INTEGER NOT NULL, text TEXT,
+    author TEXT NOT NULL, author_name TEXT, updated TEXT DEFAULT (datetime('now','localtime'))
+);
 CREATE TABLE IF NOT EXISTS weights (date TEXT PRIMARY KEY, kg REAL NOT NULL, source TEXT);
 CREATE TABLE IF NOT EXISTS excluded (source TEXT, source_id TEXT, PRIMARY KEY (source, source_id));
 """
@@ -217,6 +221,28 @@ def add_comment(user: dict, key: str, day: str, text: str) -> dict:
 def delete_comment(user: dict, cid: int) -> bool:
     with db.session() as c:
         return c.execute("DELETE FROM comments WHERE id=? AND author=?", (cid, user["login"])).rowcount > 0
+
+
+# ---------------- оценка тренера ----------------
+def evaluations(start: str, end: str) -> list[dict]:
+    with db.session() as c:
+        return [dict(r) for r in c.execute("SELECT * FROM evaluations WHERE date BETWEEN ? AND ?", (start, end))]
+
+
+def set_evaluation(user: dict, key: str, day: str, rating: int, text: str) -> dict:
+    if not 1 <= rating <= 5:
+        raise ValueError("Оценка от 1 до 5")
+    date.fromisoformat(day)
+    with db.session() as c:
+        c.execute("INSERT OR REPLACE INTO evaluations (key, date, rating, text, author, author_name, updated) "
+                  "VALUES (?,?,?,?,?,?,datetime('now','localtime'))",
+                  (key, day, rating, text.strip()[:2000], user["login"], user.get("name") or user["login"]))
+        return dict(c.execute("SELECT * FROM evaluations WHERE key=?", (key,)).fetchone())
+
+
+def delete_evaluation(key: str):
+    with db.session() as c:
+        c.execute("DELETE FROM evaluations WHERE key=?", (key,))
 
 
 # ---------------- недельный отчёт ----------------
