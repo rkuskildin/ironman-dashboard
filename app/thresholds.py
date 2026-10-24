@@ -77,6 +77,8 @@ def zone_of(hr: float, zones: list[int]) -> int:
 
 def lthr_for(sport: str) -> float:
     t = get()
+    if sport == "swim":  # в воде пульс на пороге ниже, чем на суше (горизонтальное положение, охлаждение)
+        return t["lthr_run"] - 12
     return t["lthr_bike"] if sport == "bike" else t["lthr_run"]
 
 

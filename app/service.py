@@ -138,7 +138,14 @@ def activities(start: str, end: str) -> list[dict]:
             r["tss"] = None  # Garmin/TP не знают порогового темпа в воде и дают почти ноль — считаем сами по темпу
         if not r["tss"] and not r.get("load_note"):
             mv_ = r.get("moving_s") or r["duration_s"]
-            r["tss"] = estimate_tss(r["sport"], mv_, None if r["sport"] == "swim" else r["avg_hr"], r["np"], r["distance_m"])
+            if r["sport"] == "swim":
+                # по темпу недооценивает медленное плавание (порог CSS по умолчанию быстрее реального),
+                # по пульсу с запястья в воде — тоже занижает; берём большее из двух
+                hr_ = max([h for h in (r.get("avg_hr"), r.get("garmin_avg_hr")) if h] or [0]) or None
+                cands = [estimate_tss("swim", mv_, None, None, r["distance_m"]), hr_ and estimate_tss("swim", mv_, hr_)]
+                r["tss"] = max([c for c in cands if c] or [None]) if any(cands) else None
+            else:
+                r["tss"] = estimate_tss(r["sport"], mv_, r["avg_hr"], r["np"], r["distance_m"])
             r["tss_estimated"] = True
     return primary
 
@@ -166,8 +173,8 @@ def fitness(days: int = 180, forward: int = 21) -> list[dict]:
     warm = start - timedelta(days=365)
     daily = defaultdict(float)
     for a in activities(warm.isoformat(), today.isoformat()):
-        if not a.get("excluded"):
-            daily[a["date"]] += a["tss"] or 0
+        # «сбойная запись» искажает темп и рекорды, но нагрузка на организм была — в форме считаем
+        daily[a["date"]] += a["tss"] or 0
     for p in planned((today + timedelta(days=1)).isoformat(), end.isoformat()):
         daily[p["date"]] += p["tss"] or 0
     series = [s for s in fitness_series(daily, warm, end) if s["date"] >= start.isoformat()]
@@ -379,8 +386,7 @@ def load_breakdown(days: int = 14) -> dict:
         for d in out:
             if d["date"] >= lim:
                 for it in d["items"]:
-                    if not it["excluded"]:
-                        acc[it["sport"]] += it["tss"]
+                    acc[it["sport"]] += it["tss"]
         return {k: round(v) for k, v in sorted(acc.items(), key=lambda x: -x[1])}
     cur = fit.get(today.isoformat()) or {}
     return {"days": out, "by_sport_7": sums(7), "by_sport_14": sums(14),

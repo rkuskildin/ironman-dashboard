@@ -324,7 +324,7 @@ function workoutRow(row) {
       ${p?.duration_estimated ? `<div class="muted" style="font-size:12px;margin-top:4px">≈ время плана оценено по дистанции в спокойном темпе</div>` : ""}
       ${a ? `<div class="muted" style="font-size:12px;margin-top:4px">Источник: ${esc(a.source)}</div>` : ""}
       ${a ? `<label class="excl athlete-only"><input type="checkbox" ${a.excluded ? "checked" : ""}
-        onchange="toggleExclude('${esc(a.source)}','${esc(a.source_id)}',this.checked)"> Не учитывать в статистике (сбойная запись: неверная длина бассейна, GPS)</label>` : ""}
+        onchange="toggleExclude('${esc(a.source)}','${esc(a.source_id)}',this.checked)"> Не учитывать в темпе, рекордах и прогнозе (сбойная запись: неверная длина бассейна, GPS) — в нагрузке остаётся</label>` : ""}
       ${(p || a) && row.date <= iso(new Date()) ? evalHtml(commentKey(row)) : ""}
       <div class="thread" data-key="${esc(commentKey(row))}" data-date="${row.date}"></div>
     </div>`;
@@ -1469,9 +1469,9 @@ async function renderLoad() {
       <div class="chart-box sm" style="margin-top:12px"><canvas id="c-why"></canvas></div>
       <div class="tsb-days">${lb.days.slice().reverse().filter((d) => d.items.length).map((d) => `<div class="tsb-day"><div class="tsb-dh"><b>${fmtDay(d.date)}</b>
           <span class="muted num">TSS ${Math.round(d.tss || 0)} · свежесть ${Math.round(d.tsb ?? 0)}</span></div>
-        ${d.items.map((it) => `<div class="tsb-it ${it.excluded || it.note ? "off" : ""}" style="--c:${sportColor(it.sport)}">${icon(it.sport)}<span>${esc(it.title || SPORT[it.sport]?.name || "")}
-          <em class="muted">${it.minutes} мин · ${it.source}${it.estimated && !it.note ? " · TSS по пульсу" : ""}${it.note ? " · " + esc(it.note) : ""}${it.excluded ? " · не учитывается" : ""}</em></span>
-          <b class="num">${it.note || it.excluded ? "—" : Math.round(it.tss)}</b></div>`).join("")}</div>`).join("")}</div>
+        ${d.items.map((it) => `<div class="tsb-it ${it.note ? "off" : ""}" style="--c:${sportColor(it.sport)}">${icon(it.sport)}<span>${esc(it.title || SPORT[it.sport]?.name || "")}
+          <em class="muted">${it.minutes} мин · ${it.source}${it.estimated && !it.note ? " · TSS по пульсу" : ""}${it.note ? " · " + esc(it.note) : ""}${it.excluded ? " · не в темпе и рекордах" : ""}</em></span>
+          <b class="num">${it.note ? "—" : Math.round(it.tss)}</b></div>`).join("")}</div>`).join("")}</div>
     </div>
     <div class="card chart-card"><h3>Фитнес (CTL) и усталость (ATL)</h3>
       <div class="sub">Пунктир — прогноз по плану тренера на 3 недели вперёд</div>
@@ -1488,10 +1488,10 @@ async function renderLoad() {
       <div class="chart-box sm"><canvas id="c-comp"></canvas></div></div>`;
   el.querySelectorAll(".seg button").forEach((b) => (b.onclick = () => { loadDays = +b.dataset.d; renderLoad(); }));
 
-  const whySports = [...new Set(lb.days.flatMap((d) => d.items.filter((i) => !i.note && !i.excluded).map((i) => i.sport)))];
+  const whySports = [...new Set(lb.days.flatMap((d) => d.items.filter((i) => !i.note).map((i) => i.sport)))];
   mkChart("c-why", { data: { labels: lb.days.map((d) => fmtShort(d.date)), datasets: [
     ...whySports.map((sp) => ({ type: "bar", label: SPORT[sp]?.name || sp, stack: "t", borderRadius: 3, maxBarThickness: 28,
-      backgroundColor: css(sportColor(sp).slice(4, -1)), data: lb.days.map((d) => Math.round(d.items.filter((i) => i.sport === sp && !i.note && !i.excluded).reduce((a, i) => a + i.tss, 0)) || null) })),
+      backgroundColor: css(sportColor(sp).slice(4, -1)), data: lb.days.map((d) => Math.round(d.items.filter((i) => i.sport === sp && !i.note).reduce((a, i) => a + i.tss, 0)) || null) })),
     { type: "line", label: "Свежесть (TSB)", data: lb.days.map((d) => d.tsb), borderColor: css("--ink-2"), backgroundColor: css("--ink-2"), borderWidth: 2, pointRadius: 2, yAxisID: "y" },
   ] }, options: { ...timeOpts(), scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: css("--grid") }, border: { display: false } } } } });
   const labels = fit.map((d) => fmtShort(d.date));
