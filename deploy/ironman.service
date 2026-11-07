@@ -1,0 +1,18 @@
+[Unit]
+Description=Ironman Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ironman
+WorkingDirectory=/opt/ironman/app
+ExecStart=/opt/ironman/venv/bin/uvicorn app.server:app --host 127.0.0.1 --port 8000 --proxy-headers
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ironman/app/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

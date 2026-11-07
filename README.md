@@ -43,7 +43,7 @@ cp .env.example .env            # заполнить доступы, см. ни�
 ### Пользователи
 
 ```bash
-python -m app.auth add robert --role athlete     # полный доступ
+python -m app.auth add athlete --role athlete    # полный доступ
 python -m app.auth add coach --role coach        # тренер: просмотр и комментарии
 python -m app.auth invite coach --role coach     # одноразовая ссылка, пароль задаёт сам человек
 python -m app.auth list | remove <логин>
@@ -65,13 +65,21 @@ ln -s "$PWD/widget/ironman.widget.jsx" ~/Library/Application\ Support/Übersicht
 
 ## Развёртывание на сервере
 
-Проверено на Ubuntu 24.04: пользователь `ironman`, код в `/opt/ironman/app`, systemd-служба `ironman` (uvicorn на 127.0.0.1:8000), Caddy с автоматическим HTTPS перед ней, файрвол ufw (22, 80, 443). Данные синхронизируются раз в час (`SYNC_INTERVAL_MIN`).
+Нужен VPS с Ubuntu 24.04 (1 ядро, 1 ГБ памяти хватает). Под root:
 
 ```bash
-./deploy.sh        # rsync кода на DEPLOY_HOST (по умолчанию ssh-хост «ironman»), перезапуск службы
+curl -fsSL https://raw.githubusercontent.com/rkuskildin/ironman-dashboard/main/deploy/setup-server.sh | bash -s -- [домен]
 ```
 
-`deploy.sh` не трогает `data/` и `.env` на сервере.
+Скрипт ставит Python, Caddy (HTTPS выпускается сам) и файрвол, заводит пользователя `ironman`, клонирует код в `/opt/ironman/app`, запускает службу `ironman` и создаёт `.env` из шаблона. Без домена адрес будет `<ip-через-дефисы>.nip.io`. Дальше: заполнить `/opt/ironman/app/.env`, `systemctl restart ironman`, завести вход `ironman-user add <логин> --role athlete`, подключить источники (см. выше). Данные синхронизируются раз в час (`SYNC_INTERVAL_MIN`), новые тренировки с Garmin — раз в 10 минут.
+
+Обновление до свежей версии:
+
+```bash
+sudo -u ironman git -C /opt/ironman/app pull && /opt/ironman/venv/bin/pip install -q -r /opt/ironman/app/requirements.txt && systemctl restart ironman
+```
+
+Образцы настроек — `deploy/ironman.service` и `deploy/Caddyfile.example`. `./deploy.sh` — выкладка с локальной копии по rsync (не трогает `data/` и `.env` на сервере).
 
 ## Устройство
 
